@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Whistle In-Browser</title>
+<style>
+:root {
+  --bg: #f4f1ea; --panel: #fbf9f4; --ink: #1f1d1a; --muted: #6b665d; --line: #d9d3c6;
+  --accent: #2f6b4f; --accent-ink: #ffffff; --warn-bg: #f3e6c8; --warn-ink: #5c4510; --err: #9b2c1f;
+  --chip: #ece7dc;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171614; --panel: #1f1e1b; --ink: #ebe7df; --muted: #9c968b; --line: #34312c;
+    --accent: #5fa883; --accent-ink: #101410; --warn-bg: #3a3020; --warn-ink: #ecd9a8; --err: #e07a68;
+    --chip: #2a2824;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 28px 16px 40px; }
+h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -0.01em; }
+a { color: var(--accent); }
+.sub { color: var(--muted); margin: 0 0 18px; }
+.notice { background: var(--warn-bg); color: var(--warn-ink); padding: 8px 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 14px; }
+.bar { height: 6px; background: var(--chip); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+.bar > div { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+.status { font-size: 14px; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select, input[type=text], .file {
+  height: 36px; font: inherit; font-size: 14px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); padding: 0 12px; }
+button { cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button.rec { background: var(--err); border-color: var(--err); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+.file { display: inline-flex; align-items: center; cursor: pointer; }
+.file input { display: none; }
+input[type=text] { flex: 1; min-width: 180px; }
+label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; height: 36px; }
+.opts { margin-top: 12px; }
+audio { width: 100%; margin-top: 12px; height: 36px; }
+#transcript { font-size: 18px; min-height: 54px; white-space: pre-wrap; }
+#transcript.partial { color: var(--muted); }
+#meta { font-size: 13px; color: var(--muted); margin-top: 6px; }
+#words { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+#words span { background: var(--chip); border-radius: 4px; padding: 2px 6px; font-size: 13px; cursor: pointer; }
+#words span small { color: var(--muted); margin-left: 4px; }
+.examples { margin-top: 12px; font-size: 14px; color: var(--muted); }
+.examples button { height: 30px; font-size: 13px; }
+.err { color: var(--err); }
+footer { color: var(--muted); font-size: 13px; margin-top: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Whistle In-Browser</h1>
+  <p class="sub">Model: <a href="https://huggingface.co/Cactus-Compute/whistle" target="_blank" rel="noopener">Cactus-Compute/whistle</a>. A 17 MB speech recognizer for English, German, French, Spanish, Italian, Dutch and Polish, running on your device. Audio never leaves the browser.</p>
+  <div id="notice" class="notice"></div>
+
+  <div class="panel" id="loadPanel">
+    <div class="status" id="status">Starting…</div>
+    <div class="bar"><div id="bar"></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <button id="recBtn" class="primary" disabled>Record</button>
+      <label class="file" id="fileLbl">Upload audio<input id="file" type="file" accept="audio/*,video/*"></label>
+      <label class="chk"><input id="live" type="checkbox" checked> Live transcript while recording</label>
+    </div>
+    <div class="row opts">
+      <select id="lang" aria-label="Language">
+        <option value="">Auto-detect</option><option value="en">English</option><option value="de">German</option>
+        <option value="fr">French</option><option value="es">Spanish</option><option value="it">Italian</option>
+        <option value="nl">Dutch</option><option value="pl">Polish</option>
+      </select>
+      <input id="kw" type="text" placeholder="Keyword biasing, e.g. Siobhan, Krzysztof">
+      <label class="chk"><input id="ts" type="checkbox" checked> Word timestamps</label>
+    </div>
+    <div class="examples row">Examples:
+      <button data-ex="en">English</button><button data-ex="de">German</button>
+      <button data-ex="fr">French</button><button data-ex="es">Spanish</button>
+    </div>
+    <audio id="player" controls hidden></audio>
+  </div>
+
+  <div class="panel">
+    <div id="transcript" class="partial">Record or upload up to 30 seconds of audio.</div>
+    <div id="meta"></div>
+    <div id="words"></div>
+  </div>
+
+  <footer>A PyTorch re-implementation of Whistle exported to ONNX (<a href="https://huggingface.co/mrfakename/whistle-ONNX" target="_blank" rel="noopener">mrfakename/whistle-ONNX</a>), run with ONNX Runtime Web on WebGPU, falling back to WebAssembly. Weights ship as the original 2/4-bit codebook pack (17 MB) and are expanded in the browser. Decoding is greedy; keyword biasing is a simple token-trie boost. Example clips are synthetic speech. <a href="https://x.com/realmrfakename" target="_blank" rel="noopener">Twitter / X</a></footer>
+</main>
+<script>
+const SR = 16000, MAX = 30 * SR;
+const $ = (id) => document.getElementById(id);
+const LANG = { en: "English", de: "German", fr: "French", es: "Spanish", it: "Italian", nl: "Dutch", pl: "Polish" };
+let ready = false, busy = false, seq = 0, latest = 0, lastPcm = null;
+
+// Backend selection: WebGPU when available, WebAssembly otherwise. URL overrides for testing:
+// ?enc=webgpu|wasm&dec=webgpu|wasm&prec=fp32|fp16
+const q = new URLSearchParams(location.search);
+const cfg = { enc: q.get("enc") || undefined, dec: q.get("dec") || undefined, prec: q.get("prec") || undefined };
+$("notice").hidden = true;
+const EPN = { webgpu: "WebGPU", wasm: "WebAssembly" };
+let info = null, dlStart = 0;
+
+const worker = new Worker("worker.js", { type: "module" });
+worker.postMessage({ type: "init", cfg });
+worker.onmessage = ({ data }) => {
+  if (data.type === "progress") {
+    if (!dlStart) dlStart = performance.now();
+    const pct = Math.min(100, (100 * data.loaded) / data.total);
+    $("bar").style.width = pct + "%";
+    const s = (performance.now() - dlStart) / 1000, net = data.loaded - data.cached;
+    const rate = s > 0.2 && net > 0 ? ` · ${(net / 1e6 / s).toFixed(1)} MB/s` : "";
+    $("status").textContent = data.cached >= data.total ? "Loaded model from browser cache" :
+      `Downloading model… ${(data.loaded / 1e6).toFixed(1)} / ${(data.total / 1e6).toFixed(1)} MB${rate}`;
+  } else if (data.type === "status") {
+    $("status").textContent = data.text;
+  } else if (data.type === "ready") {
+    ready = true; $("bar").style.width = "100%"; info = data.info;
+    const ep = info.encEp === info.decEp ? EPN[info.encEp] : `${EPN[info.encEp]} encoder, ${EPN[info.decEp]} decoder`;
+    $("status").textContent = `Model ready on ${ep} (${info.prec}) in ${(info.load.total_ms / 1000).toFixed(1)} s.`;
+    if (!info.gpu) { $("notice").hidden = false; $("notice").textContent = "WebGPU is not available in this browser, so Whistle runs on the CPU via WebAssembly."; }
+    window.__whistleInfo = info;
+    $("recBtn").disabled = false;
+    window.__whistleReady = true;
+  } else if (data.type === "result") {
+    busy = false;
+    if (data.id < latest && data.partial) return;
+    render(data.result, data.ms, data.partial);
+    if (!data.partial) window.__whistleLast = data.result;
+  } else if (data.type === "error") {
+    busy = false;
+    const msg = "Error: " + data.text;
+    if (!ready) { $("status").textContent = msg; $("status").className = "status err"; }
+    else { $("meta").textContent = msg; $("meta").className = "err"; }
+    window.__whistleError = data.text;
+  }
+};
+
+function render(r, ms, partial) {
+  const t = $("transcript");
+  t.textContent = r.text || (partial ? "…" : "(no speech detected)");
+  t.className = partial ? "partial" : "";
+  $("meta").className = "";
+  $("meta").textContent = partial ? "Listening…" :
+    `${LANG[r.language] || r.language || "no speech"} · first token ${Math.round(r.ttft_ms)} ms · decode ${Math.round(r.decode_tps)} tok/s · total ${Math.round(ms)} ms`
+    + (info ? ` · ${info.encEp === info.decEp ? EPN[info.encEp] : EPN[info.encEp] + " + " + EPN[info.decEp]}` : "");
+  const w = $("words"); w.innerHTML = "";
+  if (!partial && $("ts").checked) for (const x of r.words || []) {
+    const s = document.createElement("span");
+    s.textContent = x.word;
+    if (x.start != null) { const sm = document.createElement("small"); sm.textContent = x.start.toFixed(2) + "s"; s.appendChild(sm); }
+    s.title = (x.start != null ? `${x.start.toFixed(2)}–${x.end.toFixed(2)} s · ` : "") + `p=${x.probability.toFixed(3)}`;
+    s.onclick = () => { const p = $("player"); if (!p.hidden) { p.currentTime = x.start; p.play(); } };
+    w.appendChild(s);
+  }
+}
+
+function send(pcm, partial) {
+  if (!ready) return;
+  busy = true;
+  const id = ++seq; if (!partial) latest = id;
+  const kw = $("kw").value.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).join("\n");
+  const copy = pcm.slice(0, MAX);
+  worker.postMessage({ type: "transcribe", id, partial, pcm: copy, language: $("lang").value || null,
+    keywords: kw || null, timestamps: !partial && $("ts").checked }, [copy.buffer]);
+  if (!partial) { $("meta").textContent = pcm.length > MAX ? "Transcribing the first 30 s…" : "Transcribing…"; $("meta").className = ""; }
+}
+
+async function decodeTo16k(buf) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const audio = await ctx.decodeAudioData(buf);
+  ctx.close();
+  const len = Math.max(1, Math.ceil(audio.duration * SR));
+  const off = new OfflineAudioContext(1, len, SR);
+  const src = off.createBufferSource(); src.buffer = audio; src.connect(off.destination); src.start();
+  return (await off.startRendering()).getChannelData(0);
+}
+
+async function runBlob(blob) {
+  const p = $("player"); p.src = URL.createObjectURL(blob); p.hidden = false;
+  try { lastPcm = await decodeTo16k(await blob.arrayBuffer()); }
+  catch (e) { $("meta").textContent = "Could not decode that audio file."; $("meta").className = "err"; return; }
+  if (!ready) { $("meta").textContent = "Will transcribe once the model is ready…"; await waitReady(); }
+  send(lastPcm, false);
+}
+const waitReady = () => new Promise((res) => { const i = setInterval(() => { if (ready) { clearInterval(i); res(); } }, 100); });
+
+$("file").onchange = (e) => { const f = e.target.files[0]; if (f) runBlob(f); e.target.value = ""; };
+document.querySelectorAll("[data-ex]").forEach((b) => b.onclick = async () => {
+  const lang = b.dataset.ex;
+  const res = await fetch(`examples/${lang}.wav`);
+  runBlob(await res.blob());
+});
+
+// Microphone: capture raw PCM, optional live re-transcription of the growing buffer.
+let rec = null;
+$("recBtn").onclick = async () => { rec ? stopRec() : startRec(); };
+
+async function startRec() {
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }); }
+  catch (e) { $("meta").textContent = "Microphone permission denied or unavailable."; $("meta").className = "err"; return; }
+  let ctx;
+  try { ctx = new AudioContext({ sampleRate: SR }); ctx.createMediaStreamSource(stream); }
+  catch (_) { ctx = new AudioContext(); }
+  const srcNode = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(4096, 1, 1);
+  const chunks = []; let n = 0;
+  proc.onaudioprocess = (e) => { const d = e.inputBuffer.getChannelData(0); chunks.push(new Float32Array(d)); n += d.length; };
+  srcNode.connect(proc); proc.connect(ctx.destination);
+  const mr = new MediaRecorder(stream); const blobs = []; mr.ondataavailable = (e) => blobs.push(e.data); mr.start();
+  const collect = () => {
+    const all = new Float32Array(n); let o = 0; for (const c of chunks) { all.set(c, o); o += c.length; }
+    return ctx.sampleRate === SR ? all : resample(all, ctx.sampleRate);
+  };
+  const timer = setInterval(() => {
+    if ($("live").checked && ready && !busy && n > 0.5 * ctx.sampleRate) send(collect(), true);
+    if (n >= 30 * ctx.sampleRate) stopRec();
+  }, 1200);
+  rec = { stream, ctx, proc, srcNode, mr, blobs, timer, collect };
+  $("recBtn").textContent = "Stop"; $("recBtn").className = "rec";
+  $("transcript").textContent = "…"; $("transcript").className = "partial"; $("words").innerHTML = ""; $("meta").textContent = "Recording (max 30 s)";
+}
+
+function stopRec() {
+  const r = rec; rec = null; if (!r) return;
+  clearInterval(r.timer);
+  const pcm = r.collect();
+  r.proc.disconnect(); r.srcNode.disconnect(); r.ctx.close();
+  r.mr.onstop = () => { const p = $("player"); p.src = URL.createObjectURL(new Blob(r.blobs, { type: r.mr.mimeType })); p.hidden = false; };
+  r.mr.stop(); r.stream.getTracks().forEach((t) => t.stop());
+  $("recBtn").textContent = "Record"; $("recBtn").className = "primary";
+  lastPcm = pcm; send(pcm, false);
+}
+
+function resample(x, from) {
+  const ratio = from / SR, len = Math.floor(x.length / ratio), y = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
+    const p = i * ratio, i0 = Math.floor(p), f = p - i0;
+    y[i] = x[i0] * (1 - f) + (x[i0 + 1] ?? x[i0]) * f;
+  }
+  return y;
+}
+
+// Re-run the last clip when options change.
+for (const id of ["lang", "ts"]) $(id).onchange = () => { if (lastPcm && !rec) send(lastPcm, false); };
+</script>
+</body>
+</html>
