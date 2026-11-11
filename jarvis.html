@@ -25,8 +25,10 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--acc);box-sh
 button.b{padding:8px 16px;font:inherit;font-size:12px;letter-spacing:.1em;border:2px solid var(--fg);background:transparent;color:var(--fg);cursor:pointer;transition:transform .12s,background .15s,color .15s}
 button.b:hover{transform:translate(-2px,-2px);box-shadow:3px 3px 0 var(--fg)}
 button.p{background:var(--acc);color:#fff}
+
 </style></head><body>
 <button id="gear" title="Settings" aria-label="Settings">⚙</button>
+
 <div id="m"><div id="card">
 <h2>SETTINGS</h2>
 <h3>LLM · OPENAI-COMPATIBLE</h3>
@@ -36,7 +38,11 @@ button.p{background:var(--acc);color:#fff}
 <label>System prompt</label><textarea id="sys" rows="2"></textarea>
 <h3>VOICE · LOCAL</h3>
 <label>TTS model (phonon-tts)</label><input id="tts">
-<label>TTS voice</label><input id="voice">
+<label for="voice">TTS voice</label><select id="voice"><option value="">Model default</option></select>
+<div class="r"><button class="b" id="voicesLoad" type="button">LOAD VOICES</button></div>
+<label for="voiceDemo">Demo text</label><input id="voiceDemo" value="Hello. I am Jarvis, ready when you are.">
+<div class="r"><button class="b" id="voiceTest" type="button">TEST VOICE</button><button class="b" id="voiceStop" type="button" disabled>STOP</button></div>
+<p id="voiceStatus" role="status" style="font-size:11px;line-height:1.5">Models and the Phonon voice catalog load from local project files. No Hugging Face download is needed for the bundled model.</p>
 <label>STT engine</label><select id="sttMode"><option value="whistle">Whistle WebGPU (local)</option><option value="browser">Browser (Web Speech API)</option></select>
 <label>STT model (whistle-webgpu)</label><input id="stt">
 <label>Device</label><select id="dev"><option>webgpu</option><option>wasm</option></select>
@@ -45,13 +51,13 @@ button.p{background:var(--acc);color:#fff}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
 <script>
 // ---------- config ----------
-const DEF={endpoint:'https://api.openai.com/v1',key:'',model:'gpt-4o-mini',sys:'You are JARVIS, a concise, witty AI assistant.',tts:'phonon-tts',voice:'jarvis-like',stt:'whistle-webgpu',sttMode:'whistle',dev:'webgpu'};
+const DEF={endpoint:'https://api.openai.com/v1',key:'',model:'gpt-4o-mini',sys:'You are JARVIS, a concise, witty AI assistant.',tts:'phonon-tts',voice:'',stt:'whistle-webgpu',sttMode:'browser',dev:'webgpu'};
 let cfg={...DEF};try{cfg={...DEF,...JSON.parse(localStorage.getItem('jarvis-cfg')||'{}')}}catch(e){}
 const $=id=>document.getElementById(id),F=['endpoint','key','model','sys','tts','voice','stt','sttMode','dev'];
-const openM=()=>{F.forEach(k=>$(k).value=cfg[k]);$('m').classList.add('on')};
-$('gear').onclick=openM;$('x').onclick=()=>$('m').classList.remove('on');
-$('m').onclick=e=>{if(e.target.id==='m')$('m').classList.remove('on')};
-$('sv').onclick=()=>{F.forEach(k=>cfg[k]=$(k).value);try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}$('m').classList.remove('on')};
+const openM=()=>{F.forEach(k=>{if(k==='voice')setVoiceOptions(cfg.voice);else $(k).value=cfg[k]});$('m').classList.add('on');refreshVoices()};
+$('gear').onclick=openM;$('x').onclick=()=>{stopVoiceDemo();$('m').classList.remove('on')};
+$('m').onclick=e=>{if(e.target.id==='m'){stopVoiceDemo();$('m').classList.remove('on')}};
+$('sv').onclick=()=>{stopVoiceDemo();F.forEach(k=>cfg[k]=$(k).value);try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}$('m').classList.remove('on')};
 
 // ---------- palettes (hue-shifted: shadows violet, lights warm yellow) ----------
 const hx=h=>{const n=parseInt(h.slice(1),16);return 0xff000000|((n&255)<<16)|(n&0xff00)|((n>>16)&255)};
@@ -68,7 +74,7 @@ const HY=3.7,SR=6.4,sp_=Math.sin(Math.PI/6),cp_=Math.cos(Math.PI/6);
 
 // ---------- state ----------
 let W,H,S,C=document.createElement('canvas'),g2=C.getContext('2d'),img,u32,px,dep,sh,tex,spr;
-const cam={yaw:.6,zoom:1,px:0,py:0};let mode='idle',E=0,tE=0,tm=0,spkT=0,bars=new Float32Array(96),pulses=[];
+const cam={yaw:.6,zoom:1,px:0,py:0};let mode='idle',E=0,tE=0,micE=0,tm=0,spkT=0,bars=new Float32Array(96),pulses=[];
 let actx,an,fd,stream;
 const app=new PIXI.Application({background:0x0a0720,antialias:false,resolution:1,autoDensity:false});
 app.view.id='v';document.body.prepend(app.view);const hc={width:0,height:0};
@@ -208,14 +214,16 @@ async function say(txt){const t=await loadTTS();
   if(a instanceof Blob)a=await a.arrayBuffer();
   const b=a instanceof ArrayBuffer?await actx.decodeAudioData(a):(()=>{const x=actx.createBuffer(1,a.length,sr);x.copyToChannel(Float32Array.from(a),0);return x})();await play(b);return}catch(e){console.warn('tts failed',e)}}
  await new Promise(res=>{const u=new SpeechSynthesisUtterance(txt);u.onend=u.onerror=res;speechSynthesis.speak(u)})}
-async function ask(text){hist.push({role:'user',content:text});logAdd('user',text);lab.text='THINKING...';
- const r=await fetch(cfg.endpoint.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+cfg.key},body:JSON.stringify({model:cfg.model,stream:true,messages:[{role:'system',content:cfg.sys},...hist.slice(-12)]})});
- if(!r.ok)throw new Error('LLM '+r.status);
- const rd=r.body.getReader(),dc=new TextDecoder(),q=[];let buf='',sb='',full='',fin=false,sp=null;
- const pump=()=>{if(sp)return;sp=(async()=>{while(q.length||!fin){if(!q.length){await new Promise(z=>setTimeout(z,40));continue}if(aborted)break;mode='speaking';spkT=0;lab.text='< '+full.slice(-58);await speak(q.shift())}})()};
- for(;;){const{value,done}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();
-  for(const l of ls){if(!l.startsWith('data:')||l.includes('[DONE]'))continue;let t='';try{t=JSON.parse(l.slice(5)).choices[0].delta.content||''}catch(e){}full+=t;sb+=t;let m;while((m=/^([\s\S]*?[.!?])\s+/.exec(sb))){q.push(m[1]);sb=sb.slice(m[0].length);pump()}}}
- if(sb.trim()){q.push(sb);pump()}fin=true;if(sp)await sp;await drain();hist.push({role:'assistant',content:full});logAdd('ai',full)}
+async function ask(text,id=turnId){const controller=new AbortController();turnController=controller;const signal=controller.signal,user={role:'user',content:text};hist.push(user);logAdd('user',text);lab.text='THINKING...';
+ const q=[];let fin=false,sp=null,full='',sb='',buf='';
+ const check=()=>{signal.throwIfAborted();if(id!==turnId)throw new DOMException('Turn cancelled','AbortError')};
+ const pump=()=>{if(sp)return;sp=(async()=>{while(q.length||!fin){check();if(!q.length){await sleep(40);continue}mode='speaking';spkT=0;lab.text='< '+full.slice(-58);await speak(q.shift(),signal)}})();sp.catch(()=>{})};
+ try{const r=await fetch(cfg.endpoint.replace(/\/$/,'')+'/chat/completions',{signal,method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+cfg.key},body:JSON.stringify({model:cfg.model,stream:true,messages:[{role:'system',content:cfg.sys},...hist.slice(-12)]})});check();
+  if(!r.ok)throw new Error('LLM '+r.status);const rd=r.body.getReader(),dc=new TextDecoder();
+  for(;;){const{value,done}=await rd.read();check();if(done)break;buf+=dc.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop();
+   for(const l of ls){if(!l.startsWith('data:')||l.includes('[DONE]'))continue;let t='';try{t=JSON.parse(l.slice(5)).choices[0].delta.content||''}catch(e){}full+=t;sb+=t;let m;while((m=/^([\s\S]*?[.!?])\s+/.exec(sb))){q.push(m[1]);sb=sb.slice(m[0].length);pump()}}}
+  if(sb.trim()){q.push(sb);pump()}fin=true;if(sp)await sp;check();await drain(signal);check();hist.push({role:'assistant',content:full});logAdd('ai',full)
+ }finally{fin=true;controller.abort();if(id!==turnId){const i=hist.indexOf(user);if(i>=0)hist.splice(i,1)}if(turnController===controller)turnController=null}}
 async function turn(a){if(a.length<actx.sampleRate*.4)return;busy=true;aborted=false;mode='thinking';lab.text='TRANSCRIBING...';
  try{const t=(await stt(a)).trim();if(t.length>1&&!/^[\[(].*[\])]$/.test(t)){lab.text='> '+t.slice(0,58);await ask(t)}}
  catch(e){console.error(e);lab.text='ERROR: '+String(e.message||e).slice(0,50);await new Promise(z=>setTimeout(z,2500))}
@@ -225,37 +233,54 @@ async function turn(a){if(a.length<actx.sampleRate*.4)return;busy=true;aborted=f
 // STT = the whistle-webgpu Space itself: copy its files into ./whistle/  (hf download hf://spaces/mrfakename/whistle-webgpu --local-dir whistle)
 // Verified from its index.html: worker is a module worker; messages init{cfg} -> progress/status/ready/result. UNVERIFIED: the request message below.
 let ww,wReady,wRes,wseq=0;
-function loadW(){if(wReady)return wReady;wReady=new Promise((ok,bad)=>{try{ww=location.search.includes('local')?new Worker('whistle/worker.js',{type:'module'}):new Worker(URL.createObjectURL(new Blob(['import "https://huggingface.co/spaces/mrfakename/whistle-webgpu/resolve/main/worker.js"'],{type:'text/javascript'})),{type:'module'})}catch(e){return bad(e)}
+function loadW(){if(wReady)return wReady;wReady=new Promise((ok,bad)=>{try{ww=new Worker('whistle/worker.js',{type:'module'})}catch(e){return bad(e)}
  ww.onerror=()=>bad(new Error('whistle worker failed: put Space files in ./whistle/'));
  ww.onmessage=({data:d})=>{if(d.type==='progress')lab.text='STT '+Math.round(100*d.loaded/d.total)+'%';else if(d.type==='status')lab.text='STT: '+d.text;else if(d.type==='ready')ok(d);
   else if(d.type==='result'&&!d.partial&&wRes){const r=d.result||d.r||d;wRes(r.text||'');wRes=null}};
  ww.postMessage({type:'init',cfg:{}})});return wReady}
 async function stt(pcm){await loadW();const a=pcm.length>480000?pcm.slice(-480000):pcm;return new Promise(res=>{wRes=res;ww.postMessage({type:'transcribe',pcm:a,seq:++wseq})})}
 // TTS = phonon-tts exactly as documented: PhononTTS.load({lang,device}) + tts.stream(text,{voice,signal}) -> Float32Array chunks @ tts.sampleRate
-let ph,pctl,pt=0,srcs=[];
-async function loadP(){if(ph)return ph;lab.text='LOADING TTS...';let M,cdn=0;try{M=await imp('./node_modules/phonon-tts/index.js')}catch(e){cdn=1;M=await imp('https://cdn.jsdelivr.net/npm/phonon-tts/index.js')}
- const o={lang:'en',...(cdn?{workerUrl:URL.createObjectURL(new Blob(['import "https://cdn.jsdelivr.net/npm/phonon-tts/worker.js"'],{type:'text/javascript'}))}:{}),onProgress:p=>{lab.text='TTS '+Math.round(100*p.loaded/(p.total||1))+'%'}};if((cfg.tts||'').startsWith('hf://'))o.model=cfg.tts;
- if(cfg.dev==='webgpu'){try{ph=await M.PhononTTS.load({...o,device:'webgpu'})}catch(e){console.warn('phonon webgpu failed, using cpu',e);ph=await M.PhononTTS.load({...o,device:'cpu'})}}else ph=await M.PhononTTS.load({...o,device:'cpu'});return ph}
-async function speak(txt){const t=await loadP();pctl=new AbortController();
+let ph,pctl,pt=0,srcs=[],phLoading=null,phKey='';
+async function loadP(options=cfg){const key=JSON.stringify([options.tts,options.dev]);if(phLoading){await phLoading;return loadP(options)}if(ph&&phKey===key)return ph;if(ph){ph.dispose();ph=null}phKey=key;phLoading=initP(options);try{return await phLoading}finally{phLoading=null}}
+async function initP(options){lab.text='LOADING LOCAL TTS...';const M=await imp('./vendor/phonon-tts/index.js');
+ const root=new URL('./models/phonon-31m-en-local-snapshot-92741c5b07d085ff840e26fea8ce43110b87852f/',location.href),file=name=>new URL(name,root).href;
+ const o={lang:'en',model:{weights:{q8:file('model.q8.gguf')},tokenizer:file('tokenizer.json'),config:file('config.json'),voices:{default:file('default-voice.safetensors')},defaultVoice:'default'},onProgress:p=>{lab.text='TTS '+Math.round(100*p.loaded/(p.total||1))+'%'}};if((options.tts||'').startsWith('hf://'))o.model=options.tts;
+ if(options.dev==='webgpu'){try{ph=await M.PhononTTS.load({...o,device:'webgpu'})}catch(e){console.warn('phonon webgpu failed, using cpu',e);ph=await M.PhononTTS.load({...o,device:'cpu'})}}else ph=await M.PhononTTS.load({...o,device:'cpu'});return ph}
+async function speak(txt,signal){signal?.throwIfAborted();const t=await loadP();signal?.throwIfAborted();pctl=new AbortController();
  if(!pAn){pAn=actx.createAnalyser();pAn.fftSize=256;pFd=new Uint8Array(pAn.frequencyBinCount);pAn.connect(actx.destination)}
- const v=t.voices&&t.voices.includes(cfg.voice)?cfg.voice:undefined;
- for await(const c of t.stream(txt,{voice:v,signal:pctl.signal})){const b=actx.createBuffer(1,c.length,t.sampleRate);b.getChannelData(0).set(c);const s=actx.createBufferSource();s.buffer=b;s.connect(pAn);pt=Math.max(pt,actx.currentTime+.05);s.start(pt);pt+=b.duration;srcs.push(s)}}
-async function drain(){while(actx&&pt>actx.currentTime+.02&&!aborted)await new Promise(r=>setTimeout(r,50));pAn=null}
+ const v=await resolveVoice(t,cfg.voice);signal?.throwIfAborted();
+ for await(const c of t.stream(txt,{voice:v,signal:pctl.signal})){signal?.throwIfAborted();const b=actx.createBuffer(1,c.length,t.sampleRate);b.getChannelData(0).set(c);const s=actx.createBufferSource();s.buffer=b;s.connect(pAn);pt=Math.max(pt,actx.currentTime+.05);s.start(pt);pt+=b.duration;srcs.push(s)}}
+async function drain(signal){while(actx&&pt>actx.currentTime+.02&&!aborted){signal?.throwIfAborted();await sleep(50)}signal?.throwIfAborted();pAn=null}
 function stopSpeech(){pctl&&pctl.abort();srcs.forEach(s=>{try{s.stop()}catch(e){}});srcs=[];pt=0;pAn=null}
+
+// Voice catalog and isolated settings preview.
+const VOICE_CATALOG=new URL('./models/phonon-voices-local/',location.href).href;
+let voiceCatalog=[],catalogLoading=null,demoAudio=null,demoUrl=null,demoController=null,demoRestoreMic=false;
+function setVoiceOptions(selected=$('voice').value){const select=$('voice');select.replaceChildren(new Option('Model default',''));for(const name of ph?.voices||[])select.add(new Option(name,name));for(const v of voiceCatalog){const id='catalog:'+v.voice_id;if(!Array.from(select.options).some(o=>o.value===id))select.add(new Option(v.name+' · '+v.locale+' · '+v.gender,id))}if(selected&&!Array.from(select.options).some(o=>o.value===selected))select.add(new Option(selected+' (saved)',selected));select.value=selected}
+async function refreshVoices(){const button=$('voicesLoad');button.disabled=true;$('voiceStatus').textContent='Loading local voice catalog...';try{if(!voiceCatalog.length){if(!catalogLoading)catalogLoading=(async()=>{const r=await fetch(VOICE_CATALOG+'voices.jsonl');if(!r.ok)throw new Error('Voice catalog HTTP '+r.status);return (await r.text()).split('\n').filter(s=>s.trim()).map(s=>JSON.parse(s)).filter(v=>v.language==='en').sort((a,b)=>a.name.localeCompare(b.name))})();try{voiceCatalog=await catalogLoading}finally{catalogLoading=null}}setVoiceOptions();$('voiceStatus').textContent=voiceCatalog.length+' English catalog voices available. Test uses the model and device currently shown; Save applies your selection.'}catch(e){$('voiceStatus').textContent='Could not load voices: '+e.message+' — retry Load Voices.'}finally{button.disabled=false}}
+async function resolveVoice(tts,name){if(!name)return undefined;if(name.startsWith('catalog:')){if(!voiceCatalog.length)await refreshVoices();const v=voiceCatalog.find(v=>'catalog:'+v.voice_id===name);if(!v)throw new Error('Selected voice is unavailable. Reload the voice catalog.');if(!tts.voices.includes(name))await tts.addVoice(name,VOICE_CATALOG+v.filename);return name}if(!tts.voices.includes(name))throw new Error('Voice "'+name+'" is not in this model. Choose a voice in Settings.');return name}
+function stopVoiceDemo(){demoController?.abort();demoController=null;if(demoAudio){demoAudio.pause();demoAudio=null}if(demoUrl){URL.revokeObjectURL(demoUrl);demoUrl=null}$('voiceStop').disabled=true;$('voiceTest').disabled=false;const restore=demoRestoreMic;demoRestoreMic=false;if(restore&&mode==='listening'&&muted)setMute(false)}
+async function testVoice(){if(busy||mode==='thinking'||mode==='speaking'){$('voiceStatus').textContent='Wait for the current AI response to finish, then test a voice.';return}stopVoiceDemo();if(mode==='listening'&&!muted){demoRestoreMic=true;setMute(true);prev=null;quiet=0}const controller=new AbortController();demoController=controller;$('voiceTest').disabled=true;$('voiceStop').disabled=false;const text=$('voiceDemo').value.trim();try{if(!text)throw new Error('Enter a short demo text.');$('voiceStatus').textContent='Loading TTS model and voice...';const t=await loadP({tts:$('tts').value,dev:$('dev').value});if(controller.signal.aborted)return;setVoiceOptions();const voice=await resolveVoice(t,$('voice').value);if(controller.signal.aborted)return;$('voiceStatus').textContent='Generating demo...';const wav=await t.synthWav(text.slice(0,300),{voice,signal:controller.signal});if(controller.signal.aborted)return;demoUrl=URL.createObjectURL(wav);demoAudio=new Audio(demoUrl);demoAudio.onended=()=>{stopVoiceDemo();$('voiceStatus').textContent='Demo finished.'};await demoAudio.play();$('voiceStatus').textContent='Playing selected voice...'}catch(e){if(!controller.signal.aborted){stopVoiceDemo();$('voiceStatus').textContent='Voice preview failed: '+e.message}}finally{if(demoController===controller&&!demoAudio)stopVoiceDemo()}}
+$('voicesLoad').onclick=refreshVoices;$('voiceTest').onclick=testVoice;$('voiceStop').onclick=()=>{stopVoiceDemo();$('voiceStatus').textContent='Demo stopped.'};
 
 // ---------- v3: mute, noise gate, live text, STT engine switch, 3D history, cyan AI theme ----------
 // (later function declarations override the earlier ones: tap, turn, startVAD, stt, hud)
-let muted=false,theme=0,tcol=0xffb400,nf=.004,vc=0,lastLive=0,liveBusy=false,rec=null,wq=Promise.resolve(),page=0;const LOG=[],btns=[],hTx=[];
+let muted=false,theme=0,tcol=0xffb400,nf=.004,vc=0,lastLive=0,liveBusy=false,rec=null,wq=Promise.resolve();const LOG=[],btns=[],hTx=[];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const STT_DEBOUNCE_MS=1100;let sttTimer=null,sttPending='';
+function clearSTTDebounce(){clearTimeout(sttTimer);sttTimer=null;sttPending=''}
+function debounceSTT(text=''){if(text)sttPending+=(sttPending?' ':'')+text;clearTimeout(sttTimer);if(!sttPending)return;sttTimer=setTimeout(()=>{const t=sttPending;clearSTTDebounce();if(mode==='listening'&&!busy&&!muted&&!junk(t))userText(t)},STT_DEBOUNCE_MS)}
 const junk=t=>t.length<2||/^[\s.,!?-]*(you|uh+|um+|hm+|mm+|ah+|oh+|thanks for watching|bye)?[\s.,!?-]*$/i.test(t)||/^[\[(*].*[\])*]$/.test(t);
 const c3=h=>parseInt(h.slice(1),16),GR=['#5a1f8a','#e8541c','#ffb400','#fff1a0'].map(c3),CYr=['#1a2f8a','#1fa3d6','#44e0e8','#e4fffb'].map(c3),GH=['#1a0e3c','#3a1450','#6a2a50'].map(c3),CHz=['#0c1a4a','#0f3a6a','#1a6a8a'].map(c3);
 const mixc=(a,b,t)=>[((a>>16&255)*(1-t)+(b>>16&255)*t)|0,((a>>8&255)*(1-t)+(b>>8&255)*t)|0,((a&255)*(1-t)+(b&255)*t)|0],abgr=c=>0xff000000|(c[2]<<16)|(c[1]<<8)|c[0];
 function themeStep(){theme+=((mode==='speaking'?1:0)-theme)*.07;for(let i=0;i<4;i++)P[4+i]=abgr(mixc(GR[i],CYr[i],theme));for(let i=0;i<3;i++)HZ[i]=abgr(mixc(GH[i],CHz[i],theme));const c=mixc(0xffb400,0x44e0e8,theme);tcol=(c[0]<<16)|(c[1]<<8)|c[2]}
-function logAdd(role,text){LOG.push({role,text,s:-1.5,a:0,t:null});page=0}
+function logAdd(role,text){const t=new PIXI.Text((role==='user'?'YOU':'JARVIS')+'\n'+text,{fontFamily:'ui-monospace,Menlo,Consolas,monospace',fontSize:18,lineHeight:28,fill:role==='user'?0xfff1a0:0xe4fffb,wordWrap:true,wordWrapWidth:480,breakWords:true});t.resolution=2;t.alpha=0;t.logTime=performance.now();app.stage.addChild(t);LOG.push(t)}
 const mkT=()=>{const t=new PIXI.Text('',{fontFamily:'ui-monospace,Menlo,Consolas,monospace',fontSize:12,fill:0xffffff,letterSpacing:2});app.stage.addChild(t);return t},lt=k=>hTx[k]||(hTx[k]=mkT());
 // mute
 function setMute(v){muted=v;stream&&stream.getAudioTracks().forEach(t=>t.enabled=!v);if(v){stopRec();chunks=[];talking=false;vc=0;if(mode==='listening')lab.text='MIC MUTED (M)'}else if(mode==='listening'){lab.text='LISTENING...';startRec()}}
-addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(e.key==='m'||e.key==='M')setMute(!muted)});
+let turnId=0,turnController=null;
+function cancelTurn(){turnId++;aborted=true;turnController?.abort();turnController=null;stopSpeech();stopRec();chunks=[];prev=null;talking=false;quiet=0;vc=0;busy=false;if(mode!=='idle'){mode='listening';lab.text=muted?'MIC MUTED (M)':'LISTENING...';startRec()}}
+addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();stopVoiceDemo();cancelTurn();return}if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(e.key==='m'||e.key==='M')setMute(!muted)});
 // engine switch (settings or HUD)
 function applyEngine(){stopRec();if(mode==='listening'&&!muted&&!busy){if(cfg.sttMode==='browser')startRec();else loadW().catch(console.error)}}
 function setEngine(){cfg.sttMode=cfg.sttMode==='browser'?'whistle':'browser';try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}applyEngine()}
@@ -263,12 +288,12 @@ $('sv').addEventListener('click',()=>setTimeout(applyEngine,0));
 // browser STT: interim text shown live
 function startRec(){if(cfg.sttMode!=='browser'||rec||muted||busy)return;const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R){lab.text='BROWSER STT UNSUPPORTED';return}
  rec=new R();rec.continuous=true;rec.interimResults=true;rec.lang=navigator.language||'en-US';
- rec.onresult=e=>{if(busy||muted)return;let t='',fin=false,cf=1;for(let i=e.resultIndex;i<e.results.length;i++){t+=e.results[i][0].transcript;if(e.results[i].isFinal){fin=true;cf=Math.min(cf,e.results[i][0].confidence||1)}}
-  t=t.trim();if(!t)return;lab.text='> '+t.slice(-58);if(fin&&cf>.35&&!junk(t))userText(t)};
+ rec.onresult=e=>{if(busy||muted)return;let t='',final='';for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];t+=r[0].transcript;if(r.isFinal&&(r[0].confidence||1)>.35)final+=(final?' ':'')+r[0].transcript}
+  t=t.trim();if(!t)return;lab.text='> '+t.slice(-58);debounceSTT(final.trim())};
  rec.onerror=e=>{if(e.error==='not-allowed')lab.text='MIC / SPEECH PERMISSION DENIED'};
  rec.onend=()=>{rec=null;if(mode==='listening'&&!busy&&!muted&&cfg.sttMode==='browser')setTimeout(startRec,200)};
  try{rec.start()}catch(e){rec=null}}
-function stopRec(){if(rec){rec.onend=null;try{rec.abort()}catch(e){}rec=null}}
+function stopRec(){clearSTTDebounce();if(rec){rec.onend=null;try{rec.abort()}catch(e){}rec=null}}
 // whistle STT, serialized so live partials and the final pass never collide
 function stt(pcm){const r=wq.then(async()=>{await loadW();const a=pcm.length>480000?pcm.slice(-480000):pcm;return new Promise(res=>{wRes=res;ww.postMessage({type:'transcribe',pcm:a,seq:++wseq})})});wq=r.catch(()=>{});return r}
 // VAD with adaptive noise floor + minimum voiced length; live text every ~1.3 s
@@ -276,50 +301,45 @@ function startVAD(src){proc=actx.createScriptProcessor(4096,1,1);const z=actx.cr
  proc.onaudioprocess=e=>{if(!vadOn||busy||muted||cfg.sttMode==='browser')return;const d=e.inputBuffer.getChannelData(0);let s=0;for(let i=0;i<d.length;i++)s+=d[i]*d[i];const rms=Math.sqrt(s/d.length),thr=Math.max(.02,nf*3+.01);
   if(rms>thr){if(!talking&&prev)chunks.push(prev);talking=true;quiet=0;vc++}else if(!talking)nf=nf*.97+rms*.03;else quiet+=d.length/actx.sampleRate;
   if(talking){chunks.push(new Float32Array(d));const now=performance.now();
-   if(now-lastLive>1300&&!liveBusy&&chunks.length>4){lastLive=now;liveBusy=true;stt(cat(chunks)).then(t=>{if(talking&&t)lab.text='> '+t.trim().slice(-58)}).catch(()=>{}).finally(()=>{liveBusy=false})}
-   if(quiet>.9){const a=cat(chunks),ok=vc>=3;chunks=[];talking=false;quiet=0;vc=0;if(ok)turn(a);else lab.text='LISTENING...'}}else prev=new Float32Array(d)}}
-async function turn(a){if(a.length<actx.sampleRate*.5)return;busy=true;aborted=false;mode='thinking';lab.text='TRANSCRIBING...';let t='';
- try{t=(await stt(a)).trim()}catch(e){console.error(e);lab.text='ERROR: '+String(e.message||e).slice(0,50);await sleep(2500)}
- if(t&&!junk(t))await userText(t);else{busy=false;if(mode!=='idle'){mode='listening';lab.text='LISTENING...'}}}
-async function userText(t){busy=true;aborted=false;stopRec();mode='thinking';lab.text='> '+t.slice(0,58);
- try{await ask(t)}catch(e){console.error(e);lab.text='ERROR: '+String(e.message||e).slice(0,50);await sleep(2500)}
- busy=false;pAn=null;if(mode!=='idle'){mode='listening';lab.text=muted?'MIC MUTED (M)':'LISTENING...';startRec()}}
+   if(now-lastLive>1300&&!liveBusy&&chunks.length>4){lastLive=now;liveBusy=true;const id=turnId;stt(cat(chunks)).then(t=>{if(id===turnId&&talking&&t)lab.text='> '+t.trim().slice(-58)}).catch(()=>{}).finally(()=>{liveBusy=false})}
+   if(quiet>STT_DEBOUNCE_MS/1000){const a=cat(chunks),ok=vc>=3;chunks=[];talking=false;quiet=0;vc=0;if(ok)turn(a);else lab.text='LISTENING...'}}else prev=new Float32Array(d)}}
+async function turn(a){if(a.length<actx.sampleRate*.5)return;const id=++turnId;busy=true;aborted=false;mode='thinking';lab.text='TRANSCRIBING...';let t='';
+ try{t=(await stt(a)).trim()}catch(e){if(id!==turnId)return;console.error(e);lab.text='ERROR: '+String(e.message||e).slice(0,50);await sleep(2500)}
+ if(id!==turnId)return;if(t&&!junk(t))await userText(t);else{busy=false;if(mode!=='idle'){mode='listening';lab.text=muted?'MIC MUTED (M)':'LISTENING...'}}}
+async function userText(t){const id=++turnId;busy=true;aborted=false;stopRec();mode='thinking';lab.text='> '+t.slice(0,58);
+ try{await ask(t,id)}catch(e){if(id!==turnId||e.name==='AbortError')return;console.error(e);lab.text='ERROR: '+String(e.message||e).slice(0,50);await sleep(2500)}
+ if(id!==turnId)return;busy=false;pAn=null;if(mode!=='idle'){mode='listening';lab.text=muted?'MIC MUTED (M)':'LISTENING...';startRec()}}
 async function tap(){
  if(mode==='idle'){if(await mic()){mode='listening';vadOn=true;muted=false;lab.text='LISTENING...';if(cfg.sttMode==='browser')startRec();else loadW().then(()=>{if(mode==='listening'&&!muted)lab.text='LISTENING...'}).catch(e=>{console.error(e);lab.text='STT FAILED: '+String(e.message).slice(0,40)})}}
- else{vadOn=false;aborted=true;stopSpeech();stopRec();stopMic();mode='idle';busy=false;lab.text='TAP THE CORE TO SPEAK'}}
-// HUD buttons + 3D history cards
+ else{mode='idle';cancelTurn();vadOn=false;stopMic();lab.text='TAP THE CORE TO SPEAK'}}
+// Floor transcript: text-local X/Y map to world X/Z, just above the floor.
+function drawLog(){const unit=6/480,gap=.35,visible=[],now=performance.now();let height=0;
+ for(let i=LOG.length-1;i>=0;i--){const t=LOG[i];t.visible=false;const h=t.height*unit;if(visible.length>=6||visible.length&&height+h>9)continue;visible.unshift({t,h,age:LOG.length-1-i});height+=h+gap}
+ let z=-4.5;for(const {t,h,age} of visible){const p=proj(4.8,.04,z),x=proj(4.8+unit,.04,z),y=proj(4.8,.04,z+unit);
+  t.transform.setFromMatrix(new PIXI.Matrix((x[0]-p[0])*S,(x[1]-p[1])*S,(y[0]-p[0])*S,(y[1]-p[1])*S,p[0]*S,p[1]*S));const target=age===0?.85:Math.max(.12,.85*Math.exp(-age*.3-(now-t.logTime)/60000));t.alpha+=(target-t.alpha)*.06;t.visible=true;z+=h+gap}}
+// HUD buttons
 function lbl(k,s,X,Y,R,fr,fn){const d=devicePixelRatio||1,t=lt(k);t.text=s;t.style.fontSize=Math.round(11*d);t.anchor.set(R==null?.5:R?0:1,.5);t.x=X+(R==null?0:(R?10:-10)*d);t.y=Y;t.alpha=fr;t.tint=tcol;t.visible=true;
  if(fn){const w=t.width,h=t.height,x0=t.x-w*t.anchor.x-5,y0=Y-h/2-3;hgx.lineStyle(1,tcol,.7*fr).drawRect(x0,y0,w+10,h+6);if(fr>.5)btns.push({x0,y0,x1:x0+w+10,y1:y0+h+6,fn})}}
-function drawLog(){const d=devicePixelRatio||1,per=4,n=LOG.length,pgs=Math.max(1,Math.ceil(n/per)),sY=Math.sin(cam.yaw);page=Math.min(page,pgs-1);
- const pr=(x,y,z)=>{const p=proj(x,y,z);return[p[0]*S,p[1]*S]};
- for(let i=0;i<n;i++){const it=LOG[i],ix=n-1-i,ts=ix-page*per,inP=ts>=0&&ts<per;
-  it.s+=((inP?ts:ts<0?-1.5:per+1)-it.s)*.12;it.a+=((inP?Math.max(.2,1-ts*.24):0)-it.a)*.1;
-  if(!it.t){it.t=mkT();it.t.style.wordWrap=true;it.t.style.align='left'}
-  if(it.a<.02){it.t.visible=false;continue}
-  const col=it.role==='user'?0xffb400:0x44e0e8,cx=4.3+it.s,x0=cx-.12,x1=cx+.12,y1=1.5,z0=-1.8,z1=1.8,a=it.a;
-  const F=(al,pts)=>{hgx.lineStyle(Math.max(1,S>>1),col,.8*a).beginFill(col,al*a);pts.forEach((p,j)=>{const q=pr(p[0],p[1],p[2]);j?hgx.lineTo(q[0],q[1]):hgx.moveTo(q[0],q[1])});hgx.closePath().endFill()};
-  F(.1,[[x0,.05,z0],[x0,.05,z1],[x0,y1,z1],[x0,y1,z0]]);F(.1,[[x1,.05,z0],[x1,.05,z1],[x1,y1,z1],[x1,y1,z0]]);F(.07,[[x0,.05,z0],[x1,.05,z0],[x1,y1,z0],[x0,y1,z0]]);F(.07,[[x0,.05,z1],[x1,.05,z1],[x1,y1,z1],[x0,y1,z1]]);F(.28,[[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]]);
-  const fx=sY>0?x0:x1,A=pr(fx,.78,z0),B=pr(fx,.78,z1),c=pr(fx,.78,0),w=Math.abs(A[0]-B[0]),t=it.t;
-  t.visible=w>40;t.text=(it.role==='user'?'YOU> ':'AI> ')+it.text.slice(0,110);t.style.fontSize=Math.round(10*d);const ww=Math.max(60,Math.round(w*.88/24)*24);if(t.style.wordWrapWidth!==ww)t.style.wordWrapWidth=ww;
-  t.anchor.set(.5);t.x=c[0];t.y=c[1];t.tint=col;t.alpha=a*Math.min(1,Math.abs(sY)*2.5)}}
-function hud(){const d=devicePixelRatio||1,cd=proj(0,HY,0)[2];hgx.clear();btns.length=0;lab.tint=tcol;let k=0;const pg=Math.max(1,Math.ceil(LOG.length/4));
- const L=[[.2,2.6,'STATUS '+mode.toUpperCase()],[2.2,-1.2,'ENERGY '+'#'.repeat(Math.round(E*10)).padEnd(10,'.')],[3.6,2.2,'MIC '+(muted?'MUTED':'LIVE')+' [M]',()=>setMute(!muted)],[5.1,-.4,'STT '+(cfg.sttMode==='browser'?'BROWSER':'WHISTLE')+' [SWITCH]',setEngine],[1.2,-2.2,'LLM '+cfg.model]];
+
+function hud(){const d=devicePixelRatio||1,cd=proj(0,HY,0)[2];hgx.clear();btns.length=0;lab.tint=tcol;let k=0;
+ const L=[[.2,2.6,'STATUS '+mode.toUpperCase()],[2.2,-1.2,'MIC LEVEL '+'#'.repeat(Math.round(micE*10)).padEnd(10,'.')],[3.6,2.2,'MIC '+(muted?'MUTED':'LIVE')+' [M]',()=>setMute(!muted)],[5.1,-.4,'STT '+(cfg.sttMode==='browser'?'BROWSER':'WHISTLE')+' [SWITCH]',setEngine],[1.2,-2.2,'LLM '+cfg.model]];
  L.forEach(([a0,y,s,fn])=>{const a=a0+tm*.06,p=proj(Math.cos(a)*5.4,HY+y,Math.sin(a)*5.4),q=proj(Math.cos(a)*3.1,HY+y*.5,Math.sin(a)*3.1),fr=p[2]>cd?1:.3,X=Math.round(p[0]*S),Y=Math.round(p[1]*S);
   hgx.lineStyle(Math.max(1,S>>1),tcol,.55*fr).moveTo(Math.round(q[0]*S),Math.round(q[1]*S)).lineTo(X,Y);hgx.lineStyle(0).beginFill(tcol,fr).drawRect(X-S,Y-S,S*2,S*2).endFill();lbl(k++,s,X,Y,p[0]>q[0],fr,fn)});
- [['< OLDER '+(page+1)+'/'+pg,4.4,2.5,()=>{page=Math.min(pg-1,page+1)}],['NEWER >',4.4,-2.5,()=>{page=Math.max(0,page-1)}]].forEach(([s,x,z,fn])=>{const p=proj(x,.2,z);lbl(k++,s,Math.round(p[0]*S),Math.round(p[1]*S),null,1,fn)});
- for(let j=k;j<hTx.length;j++)hTx[j].visible=false;drawLog()}
+ for(let j=k;j<hTx.length;j++)hTx[j].visible=false;drawLog();}
 
+// Separate signals: microphone drives the floor; only AI activity drives the sphere.
+function updateEnergy(dt){let level=0;
+ if(mode==='listening'&&!muted&&an){an.getByteFrequencyData(fd);let sum=0;for(let i=0;i<fd.length;i++)sum+=fd[i];level=Math.min(1,sum/fd.length/110);for(let i=0;i<96;i++)bars[i]+=((fd[2+(i%48)*2]||0)/255-bars[i])*.4}else for(let i=0;i<96;i++)bars[i]*=.9;
+ micE+=(level-micE)*.25;
+ if(mode==='speaking'&&pAn){pAn.getByteFrequencyData(pFd);let sum=0;for(let i=0;i<pFd.length;i++)sum+=pFd[i];tE=Math.min(1,sum/pFd.length/90)}
+ else if(mode==='thinking')tE=.2+.15*Math.sin(tm*8);
+ else if(mode==='speaking'){spkT+=dt;tE=.15+Math.max(0,Math.sin(spkT*13)*Math.sin(spkT*4.3+1))*.72}
+ else tE=.06;
+ E+=(tE-E)*.25;if(micE>.35&&Math.random()<.18)pulses.push(0);pulses=pulses.map(r=>r+dt*4).filter(r=>r<SR)}
 // ---------- frame ----------
 let last=performance.now();
 app.ticker.add(()=>{const now=performance.now(),dt=Math.min(.05,(now-last)/1e3);last=now;tm+=dt*.55;themeStep();
- // energy
- if(mode==='listening'&&an){an.getByteFrequencyData(fd);let s=0;for(let i=0;i<fd.length;i++)s+=fd[i];tE=Math.min(1,s/fd.length/110);for(let i=0;i<96;i++)bars[i]+=((fd[2+(i%48)*2]||0)/255-bars[i])*.4}
- else if(mode==='speaking'&&pAn){pAn.getByteFrequencyData(pFd);let s=0;for(let i=0;i<pFd.length;i++)s+=pFd[i];tE=Math.min(1,s/pFd.length/90);for(let i=0;i<96;i++)bars[i]+=((pFd[2+(i%48)*2]||0)/255-bars[i])*.4}
- else if(mode==='thinking'){tE=.2+.15*Math.sin(tm*8);for(let i=0;i<96;i++)bars[i]+=(.25*(.5+.5*Math.sin(i*.4-tm*6))-bars[i])*.2}
- else if(mode==='speaking'){spkT+=dt;const e=Math.max(0,Math.sin(spkT*13)*Math.sin(spkT*4.3+1))*.9;tE=.15+e*.8;for(let i=0;i<96;i++)bars[i]+=(tE*(.5+.5*Math.sin(i*.7+tm*9))-bars[i])*.35;
-  }
- else{tE=.06+.04*Math.sin(tm*1.6);for(let i=0;i<96;i++)bars[i]*=.9}
- E+=(tE-E)*.25;if(E>.35&&Math.random()<.18)pulses.push(0);pulses=pulses.map(r=>r+dt*4).filter(r=>r<SR);
+ updateEnergy(dt);
  // points
  let n=0;const sp=tm*.25,cs=Math.cos(sp),sn=Math.sin(sp);
  for(let i=0;i<NR;i++){const r=rA[i];for(let j=0;j<NP;j++){const th=r.ph+tm*r.sp+j/NP*r.span,rr=r.R*(1+E*.45*Math.sin(j*.3+tm*4+i)),c=Math.cos(th)*rr,s=Math.sin(th)*rr;
@@ -335,7 +355,7 @@ app.ticker.add(()=>{const now=performance.now(),dt=Math.min(.05,(now-last)/1e3);
  const R0=SR-1.8;
  for(let y=0;y<H;y++){const z1=-((cy-y)/s)/sp_;for(let x=0;x<W;x++){const x1=(x-cx)/s,wx=x1*cY-z1*sY,wz=x1*sY+z1*cY,r=Math.hypot(wx,wz),k=y*W+x,b=Bay[(y&3)*4+(x&3)];
   if(r>SR)continue;const t=(r-R0)/1.8+(Math.sin(wx*7.1)*Math.cos(wz*6.3))*.18;if(t>0&&b<t)continue;
-  let tone=1.1+(((Math.floor(wx*1.2)+Math.floor(wz*1.2))&1)?.35:0)+((r%1.6)<.07?.9:0)+Math.max(0,1.5-r*.28)*(1+E*1.3)*.9;
+  let tone=1.1+(((Math.floor(wx*1.2)+Math.floor(wz*1.2))&1)?.35:0)+((r%1.6)<.07?.9:0)+Math.max(0,1.5-r*.28)*(1+micE*1.3)*.9;
   if(sh[k])tone-=1.15;const l=Math.max(0,Math.min(3,(tone+b-.5)|0));px[k]=l;dep[k]=z1*cp_}}
  // signal bars + pulses
  for(let i=0;i<96;i++){const a=i/96*6.283+sp*.5,h=.12+bars[i]*3.2,x=Math.cos(a)*3.9,z=Math.sin(a)*3.9;for(let y=0;y<h;y+=.09)plot(x,y+.03,z,2,2,Math.min(3,1+(y/h*3|0)))}
