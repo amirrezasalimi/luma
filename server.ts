@@ -1,5 +1,7 @@
 import { resolve, extname, sep } from 'node:path';
 import { createCodeAgentHandler } from './code-agent';
+import { createLocalMcpHandler, shutdownLocalMcpSessions } from './local-mcp';
+import { marketplaceHandler } from './marketplace';
 
 const root = import.meta.dir;
 const port = Number(Bun.env.PORT || 3000);
@@ -12,13 +14,14 @@ const error = (message: string, status: number) => Response.json({ error: messag
 
 export function createServerHandler(options: { port?: number; codeEnabled?: boolean; codeRoot?: string } = {}) {
   const configuredPort = options.port ?? port;
+  const localMcpHandler = createLocalMcpHandler();
   const codeHandler = createCodeAgentHandler({
     enabled: options.codeEnabled ?? Bun.env.JARVIS_CODE_AGENT === '1',
     workspace: options.codeRoot ?? Bun.env.JARVIS_CODE_ROOT ?? root,
   });
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
-    // Validate both authority sources before any proxy, coding, or asset access.
+    // Validate both authority sources before any proxy, subprocess, coding, or asset access.
     const allowedHosts = new Set(['localhost', '127.0.0.1'].map(host =>
       configuredPort === 80 ? host : `${host}:${configuredPort}`));
     if (!allowedHosts.has(req.headers.get('host') || '') || !allowedHosts.has(url.host)
@@ -30,7 +33,9 @@ export function createServerHandler(options: { port?: number; codeEnabled?: bool
         || req.headers.get('sec-fetch-site') === 'cross-site') {
       return Response.json({ error: { code: 'CROSS_ORIGIN', message: 'Cross-origin requests are not allowed' } }, { status: 403 });
     }
+    if (url.pathname === '/api/marketplace') return marketplaceHandler(req);
     if (url.pathname === '/api/code') return codeHandler(req);
+    if (url.pathname === '/api/mcp/local') return localMcpHandler(req);
     if (url.pathname === '/api/mcp') {
       if (req.method !== 'POST') return error('Use POST', 405);
       if (!req.headers.get('content-type')?.includes('application/json')) return error('Expected JSON', 415);
@@ -69,14 +74,14 @@ export function createServerHandler(options: { port?: number; codeEnabled?: bool
     if (req.method !== 'GET' && req.method !== 'HEAD') return error('Method not allowed', 405);
     let path: string;
     try {
-      path = resolve(root, '.' + decodeURIComponent(url.pathname === '/' ? '/jarvis3.html' : url.pathname));
+      path = resolve(root, '.' + decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname));
     } catch {
       return error('Invalid path', 400);
     }
     // Serve app assets without exposing source, dotfiles, or arbitrary project files.
     const relative = path.slice(root.length + 1);
     if (!path.startsWith(root + sep) || relative.split(sep).some(p => p.startsWith('.'))
-        || !(['jarvis3.html'].includes(relative) || ['vendor/', 'whistle/', 'models/'].some(p => relative.startsWith(p)))) {
+        || !(['index.html'].includes(relative) || ['vendor/', 'whistle/', 'models/'].some(p => relative.startsWith(p)))) {
       return error('Not found', 404);
     }
     const file = Bun.file(path);
@@ -89,5 +94,11 @@ export function createServerHandler(options: { port?: number; codeEnabled?: bool
 
 if (import.meta.main) {
   Bun.serve({ hostname: '127.0.0.1', port, fetch: createServerHandler() });
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(signal, () => {
+      shutdownLocalMcpSessions();
+      process.exit(signal === 'SIGINT' ? 130 : 143);
+    });
+  }
   console.log(`JARVIS: http://localhost:${port}`);
 }

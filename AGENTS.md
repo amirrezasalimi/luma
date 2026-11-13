@@ -1,0 +1,1 @@
+- do not use browser test or smoke test until user asked for it.

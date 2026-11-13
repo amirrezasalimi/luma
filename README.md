@@ -62,6 +62,38 @@ python3 -m http.server 8000
 
 Open **http://localhost:8000/jarvis.html**. Use HTTP on localhost rather than opening the HTML file directly; module workers and microphone access need a supported origin.
 
+### Marketplace and local MCP (`jarvis3.html`)
+
+Run the Bun host for marketplace discovery and MCP proxying:
+
+```sh
+bun server.ts
+```
+
+Open `http://localhost:3000`. **Settings → Marketplace** searches the official MCP Registry and `SKILL.md` files in Anthropic, OpenAI and Vercel's skill repositories. Results include source/configuration metadata and pagination. GitHub/registry requests require internet and may be rate limited. Skill installation imports the instruction file only, not supporting scripts or assets. Imports are saved **disabled**: review skill instructions in Skills or MCP configuration in MCP Servers, then use the enable checkbox. MCP entries have Edit JSON, Reconnect and Delete controls. Some registry entries require manual credentials/arguments and cannot be launched without configuration; unsupported transports are not auto-converted.
+
+Local stdio MCP execution is enabled by default when running `bun server.ts`; no environment flag is needed. To disable host process execution for MCP, start with `JARVIS_LOCAL_MCP=0 bun server.ts`.
+
+In Marketplace's **Local MCP** form, enter `bun`, `bunx` or an absolute executable path, a JSON argument array and optional environment variables. Save disabled, then enable in MCP Servers and confirm the execution warning. For example, a filesystem server may use `bunx` with `["@modelcontextprotocol/server-filesystem", "/absolute/allowed/path"]`. Follow the package's actual documentation and scope access narrowly. `bunx` downloads/caches packages on first launch; saving a config does not install or launch it. Native stdio executables are supported through absolute paths, including paths containing spaces. Commands launch directly without a shell; relative executable paths and other bare command names are rejected. Local programs run with your full host-user permissions. JSON imports also accept `{ "mcpServers": { "name": { "command": "bunx", "args": ["package"], "env": {}, "on": false } } }`.
+
+For MixMusic, paste this into **MCP Servers → Import JSON** and accept the local execution confirmation (or keep `on: false` to review before enabling):
+
+```json
+{
+  "mcpServers": {
+    "mixmusic": {
+      "command": "/Applications/MixMusic.app/Contents/MacOS/MixMusic",
+      "args": ["--mcp"],
+      "on": false
+    }
+  }
+}
+```
+
+The executable must implement MCP over newline-delimited JSON-RPC on stdin/stdout; diagnostic logs belong on stderr.
+
+**Local MCP packages run with the host user's permissions, not in a sandbox.** Credentials/environment values are stored in browser localStorage and included in configuration exports. Enable only trusted packages. Disabling/deleting stops the managed local process; re-enabling/reconnecting starts it again. Enabled configs reconnect when the page opens unless local MCP execution is explicitly disabled on the host. Process sessions idle out after 15 minutes; use Reconnect if necessary. The transport supports tools and newline-delimited stdio JSON-RPC; interactive server requests such as sampling/elicitation are not surfaced in the UI. Remote HTTP and local tools are exposed to agents, scene scripts and widgets through the existing MCP APIs. These features need the Bun host and do not work on the static hosted site alone.
+
 ### Runtime debug panel (`jarvis3.html`)
 
 Press **D** outside editable fields to toggle the debug overlay. It shows FPS, page/agent uptime, status, model, turn limits, live message counts by role, archived-message counts, compaction state, stage counts, and the last outgoing LLM context (expand an agent row). Context token counts are approximate. Request capture begins with the next request; it is diagnostic-only and not included in session snapshots.
