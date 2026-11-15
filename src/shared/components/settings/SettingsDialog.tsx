@@ -6,16 +6,22 @@ import { VoiceSettings, AgentSettings, CodeSettings } from './RuntimeTabs';
 import { SoulSettings } from './SoulSettings';
 import { IntegrationSettings } from './IntegrationSettings';
 import { MarketplaceSettings } from './MarketplaceSettings';
+import { PiExtensionsSettings } from './PiExtensionsSettings';
+import { SettingsConfirmProvider } from './ConfirmDialog';
 import { WorkspaceSettings } from './WorkspaceSettings';
 
 const TABS = [
   ['main', 'Main LLM'], ['voice', 'Voice'], ['agents', 'Sub-agents'],
   ['souls', 'Souls & Memory'], ['code', 'Code Agent'], ['skills', 'Skills'],
-  ['mcp', 'MCP Servers'], ['market', 'Marketplace'],
+  ['mcp', 'MCP Servers'], ['market', 'Marketplace'], ['pi', 'Pi Extensions'],
 ] as const;
 type Tab = typeof TABS[number][0];
 
 export function SettingsDialog() {
+  return <SettingsConfirmProvider><SettingsDialogContent /></SettingsConfirmProvider>;
+}
+
+function SettingsDialogContent() {
   const services = useRuntimeSettings(state => state.services);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('main');
@@ -71,7 +77,7 @@ export function SettingsDialog() {
             event.preventDefault(); last?.focus();
           } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
         }}>
-        <h2 id="settings-title">SETTINGS</h2>
+        <header className="settings-heading"><div><span className="settings-eyebrow">JARVIS / CONTROL CENTER</span><h2 id="settings-title">Settings</h2><p>Make this workspace yours.</p></div><button type="button" className="settings-dismiss" aria-label="Close settings" onClick={close}>×</button></header>
         <div className="settings-layout">
           <nav className="settings-nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical"
             onKeyDown={event => {
@@ -84,11 +90,12 @@ export function SettingsDialog() {
             }}>
             {TABS.map(([id, title], index) => <button key={id} ref={element => { buttons.current[index] = element; }}
               id={`settings-tab-${id}`} type="button" role="tab" aria-selected={tab === id}
-              aria-controls={`settings-page-${id}`} tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)}>{title}</button>)}
+              aria-controls={`settings-page-${id}`} tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)}><span>{title}</span><span aria-hidden="true" className="settings-nav-arrow">↗</span></button>)}
           </nav>
           <div className="settings-content">
             {TABS.map(([id]) => <section key={id} id={`settings-page-${id}`} className="settings-page" role="tabpanel"
               aria-labelledby={`settings-tab-${id}`} hidden={tab !== id}>
+              {id === 'pi' && open && tab === 'pi' && <PiExtensionsSettings />}
               {id === 'main' && <>
                 <h3>LLM · OPENAI-COMPATIBLE</h3>
                 <Field label="Endpoint" value={draft.endpoint} onChange={endpoint => patch({ endpoint })} />
@@ -113,7 +120,7 @@ export function SettingsDialog() {
           </div>
         </div>
         {error && <p role="alert">{error}</p>}
-        <div className="r settings-footer"><Action disabled={saving} onClick={close}>CLOSE</Action><Action disabled={saving} onClick={() => { void save(); }}>{saving ? 'SAVING…' : 'SAVE'}</Action></div>
+        <div className="r settings-footer"><span className="settings-footer-note">Connection & workspace preferences</span><Action disabled={saving} onClick={close}>CLOSE</Action><button type="button" className="b settings-save" disabled={saving} onClick={() => { void save(); }}>{saving ? 'SAVING…' : 'SAVE CHANGES'}</button></div>
       </div>
     </div>
   </>;

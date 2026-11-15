@@ -6,8 +6,9 @@ import { execCode } from './script-execution';
 import { holoH, resetHologramSetting } from './hologram-controls';
 import { addSkills, addMcps } from './integrations';
 
-export function exposeScriptApi(): void {
-  window.JARVIS = {
+/** Explicit module API; do not expose mutable runtime state on the browser global. */
+export function createScriptApi() {
+  return {
     act,
     spawn,
     O: profilesContextState.O,

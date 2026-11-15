@@ -67,23 +67,25 @@ export function AgentSettings({ services }: { services: SettingsServices }) {
 }
 
 export function CodeSettings({ services, active }: { services: SettingsServices; active: boolean }) {
+  const confirm = useSettingsConfirm();
   const revision = useRuntimeSettings(state => state.revision);
   const [status, setStatus] = useState('');
   const [checking, setChecking] = useState(false);
   void revision;
   async function check() {
     setChecking(true);
-    try { const result = await services.checkCodeHost(); setStatus(result.enabled ? `Server ready · workspace: ${result.workspace}` : result.error || 'Server tools disabled. Restart with JARVIS_CODE_AGENT=1.'); }
+    try { const result = await services.checkCodeHost(); setStatus(result.enabled ? `Server ready · workspace: ${result.workspace}` : result.error || 'Enable the Code Agent switch in Settings.'); }
     catch (cause) { setStatus(String(cause)); } finally { setChecking(false); }
   }
   useEffect(() => { if (active) void check(); }, [active, services]);
   return <>
     <h3>CODE AGENT · HOST ACCESS</h3>
-    <Toggle label="Enable host coding tools for main and sub-agents" checked={!!services.snapshot().agents.code} onChange={code => {
-      if (code && !confirm('Enable host filesystem and Bash tools? Bash is NOT sandboxed and runs with your full user permissions.')) return;
+    <Toggle label="Enable host coding tools for main and sub-agents" checked={!!services.snapshot().agents.code} onChange={async code => {
+      if (code && !await confirm('Enable host filesystem and Bash tools? Bash is NOT sandboxed and runs with your full user permissions.')) return;
       services.setAgentDefaults({ code }); void check();
     }} />
     <p className="mut">Tools can read, write and delete workspace files and execute Bash. Bash is NOT sandboxed. File contents and output are sent to your LLM provider. Disabling cancels active requests best-effort, but does not undo completed changes. This toggle saves immediately; the server flag must also be enabled.</p>
     <p role="status">{status}</p><Action disabled={checking} onClick={() => void check()}>CHECK SERVER</Action>
   </>;
 }
+import { useSettingsConfirm } from './ConfirmDialog';

@@ -5,7 +5,7 @@ import { scriptLifecycleState, stepTW } from './script-lifecycle';
 import { sceneObjectsState } from './scene-objects';
 import { refreshUI } from './workspace-bridge';
 import { sceneFoundationState } from './scene-foundation';
-import { rasterPrimitivesState } from './raster-primitives';
+import { holoRaster, rasterPrimitivesState } from './raster-primitives';
 import { drawMiniHolos } from './agent-renderer';
 
 interface ModuleState {
@@ -142,13 +142,6 @@ export function connectObjectFrame(): void {
     for (; o && n < 9; o = profilesContextState.O.get(o.parent)) n++;
     return n;
   };
-  {
-    const _hr: any = window.holoRaster;
-    window.holoRaster = function (): any {
-      _hr();
-      objects();
-    };
-  }
 
   // ============================================================================
   // 13. SCRIPT RUNTIME: lifecycle hooks, handles, tweens, animations, errors

@@ -1,4 +1,5 @@
 import { host } from '../../services/host';
+import { useSettingsConfirm } from './ConfirmDialog';
 import { useState } from 'react';
 import { Action, Field, Select } from './controls';
 import type { SettingsServices } from '../../services/settings';
@@ -9,6 +10,7 @@ interface MarketRow {
 }
 
 export function MarketplaceSettings({ services }: { services: SettingsServices }) {
+  const confirm = useSettingsConfirm();
   const [kind, setKind] = useState('mcp');
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<MarketRow[]>([]);
@@ -32,7 +34,7 @@ export function MarketplaceSettings({ services }: { services: SettingsServices }
   }
   async function install(row: MarketRow) {
     if (row.rawSkillUrl) {
-      if (!confirm(`Import instructions for ${row.name}? Review untrusted skill content before enabling.`)) return;
+      if (!await confirm(`Import instructions for ${row.name}? Review untrusted skill content before enabling.`)) return;
       const response = await fetch(row.rawSkillUrl, { credentials: 'omit', signal: AbortSignal.timeout(30000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const text = await response.text(); if (new Blob([text]).size > 262144) throw new Error('Skill exceeds 256 KiB');
@@ -40,8 +42,8 @@ export function MarketplaceSettings({ services }: { services: SettingsServices }
       services.importSkills(JSON.stringify([{ name: row.name, description: row.description || row.name, body: text, on: false }]));
       setStatus('Imported disabled. Review instructions in Skills, then enable.');
     } else if (row.url && !/[{}]/.test(row.url)) {
-      if (!confirm(`Save ${row.name} disabled? Review endpoint and credentials before enabling.`)) return;
-      services.importMcps([{ name: row.name, url: row.url, on: false }]); setStatus('MCP saved disabled. Review in MCP Servers.');
+      if (!await confirm(`Save ${row.name} disabled? Review endpoint and credentials before enabling.`)) return;
+      await services.importMcps([{ name: row.name, url: row.url, on: false }]); setStatus('MCP saved disabled in Pi. Review in MCP Servers.');
     } else if (row.package?.launchSupported && row.package.command) {
       setName(row.name); setCommand(row.package.command); setArgs(JSON.stringify(row.package.args || [])); setEnv('{}');
       setStatus('Review the local command below, then Save Disabled.');
@@ -55,19 +57,18 @@ export function MarketplaceSettings({ services }: { services: SettingsServices }
     <div className="r"><Action disabled={busy} onClick={() => { void run(() => browse(false)); }}>SEARCH</Action><Action disabled={busy || !cursor} onClick={() => { void run(() => browse(true)); }}>MORE</Action></div>
     {rows.map((row, index) => <article className="ar" key={`${row.name}-${index}`}><b>{row.name}</b><p className="mut">{row.description || row.source}</p><Action disabled={busy} onClick={() => { void run(() => install(row)); }}>REVIEW / INSTALL</Action><details><summary>Source & configuration</summary><pre className="settings-json">{JSON.stringify(row, null, 2)}</pre></details></article>)}
     <h3>LOCAL MCP · STDIO</h3>
-    <p className="mut">Commands run with your full host-user permissions. Packages may download dependencies. Only enable trusted commands. Environment values are stored in server SQLite and included in exports.</p>
+    <p className="mut">Pi manages stdio servers. Commands run with your full host-user permissions. Only enable trusted commands. Environment values are stored in Pi’s mcp.json and included in exports.</p>
     <Field label="Name" value={name} onChange={setName} />
-    <Field label="Command (bun, bunx or absolute executable path)" value={command} onChange={setCommand} />
+    <Field label="Command (Pi stdio executable)" value={command} onChange={setCommand} />
     <Field label="Arguments JSON string array (no shell syntax)" multiline value={args} onChange={setArgs} />
     <Field label="Environment JSON (optional secrets)" multiline value={env} onChange={setEnv} />
     <div className="r"><Action disabled={busy} onClick={() => { void run(async () => {
-      const response = await host.localMcp({ action: 'status' });
-      const result = response.data; if (response.status >= 400) throw new Error(String(result.error));
-      setStatus(result.enabled ? 'Local stdio execution enabled.' : 'Host disabled. Remove JARVIS_LOCAL_MCP=0 and restart the Bun host.');
+      const result = await host.mcp.list();
+      setStatus('Pi MCP configuration: ' + result.path);
     }); }}>CHECK HOST</Action><Action disabled={busy} onClick={() => { void run(async () => {
       const parsedArgs: unknown = JSON.parse(args), parsedEnv: unknown = JSON.parse(env);
       if (!name.trim() || !Array.isArray(parsedArgs) || !parsedArgs.every(value => typeof value === 'string') || !parsedEnv || typeof parsedEnv !== 'object' || Array.isArray(parsedEnv) || !Object.values(parsedEnv).every(value => typeof value === 'string')) throw new Error('Enter a name, string argument array and string-valued environment object');
-      services.importMcps([{ name: name.trim(), command, args: parsedArgs, env: parsedEnv, on: false }]); setStatus('Saved disabled. Review in MCP Servers before enabling.');
+      await services.importMcps([{ name: name.trim(), command, args: parsedArgs, env: parsedEnv, on: false }]); setStatus('Saved disabled in Pi. Review in MCP Servers before enabling.');
     }); }}>SAVE DISABLED</Action></div>
     <p role="status">{status}</p>
   </>;

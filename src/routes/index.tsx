@@ -6,6 +6,10 @@ import { initializeSettings } from '../stores/settings';
 import { initializePersistence } from '../shared/services/persistence';
 import { startJarvis } from '../shared/services/runtime';
 import { PersistenceStatus } from '../shared/components/PersistenceStatus';
+import { RuntimeOverlays } from '../shared/components/workspace/RuntimeOverlays';
+import { ScriptManager } from '../shared/components/workspace/ScriptManager';
+import { DiagnosticsPanel } from '../shared/components/workspace/DiagnosticsPanel';
+import { WorkspaceHosts } from '../shared/components/workspace/WorkspaceHosts';
 
 export const Route = createFileRoute('/')({ component: Jarvis });
 
@@ -25,5 +29,5 @@ function Jarvis() {
     });
   }, []);
 
-  return <><SettingsDialog /><NewSessionDialog /><PersistenceStatus />{error && <p role="alert">JARVIS startup failed: {error}</p>}</>;
+  return <><WorkspaceHosts /><SettingsDialog /><NewSessionDialog /><PersistenceStatus /><RuntimeOverlays /><ScriptManager /><DiagnosticsPanel />{error && <p role="alert">JARVIS startup failed: {error}</p>}</>;
 }

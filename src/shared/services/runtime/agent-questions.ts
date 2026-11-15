@@ -16,6 +16,7 @@ export function cancelQuestions(agentId: any = null): any {
     cancelled: true
   });
 }
+
 export function askUser(options?: any, agent: any = null): any {
   const p: any = typeof options === 'string' ? {
       question: options

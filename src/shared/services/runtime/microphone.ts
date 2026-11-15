@@ -33,7 +33,7 @@ export function stopMic(): any {
   sceneFoundationState.stream = sceneFoundationState.an = null;
 }
 export function tapCore(): any {
-  if (sceneFoundationState.talkTo) window.setTalk?.(null);else tap();
+  if (sceneFoundationState.talkTo) setTalk(null);else tap();
 }
 export async function tap(): Promise<any> {
   if (sceneFoundationState.mode === 'idle') {
@@ -61,4 +61,4 @@ export async function tap(): Promise<any> {
 // ============================================================================
 // 6. POINTER INPUT (orbit / pan / zoom / core tap / HUD buttons)
 // ============================================================================
-
+import { setTalk } from './agent-conversations';

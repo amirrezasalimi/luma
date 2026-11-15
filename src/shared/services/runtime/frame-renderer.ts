@@ -4,6 +4,8 @@ import { holoRaster, plot, proj, rasterPrimitivesState } from './raster-primitiv
 import { sceneFoundationState } from './scene-foundation';
 import { hud, sceneHudState, themeStep, updateEnergy } from './scene-hud';
 import { voicePipelineState } from './voice-pipeline';
+import { micAnchor } from './profiles-context';
+import { objects } from './object-frame';
 
 interface ModuleState {
   floorCache: any;
@@ -250,23 +252,19 @@ export function startFrameRenderer(): void {
     }
     frameDebugMark('clearAndShadowsMs');
     // Floor microphone lighting follows the same anchor as the input waves.
-    const micAnchor: any = window.jarvisMicAnchor?.() || {
-        x: sceneFoundationState.HX,
-        z: sceneFoundationState.HQ,
-        radius: 3.9
-      },
-      waveScale: any = micAnchor.radius / 3.9;
-    drawFloor(s, cx, cy, cY, sY, micAnchor, waveScale);
+    const micPosition: any = micAnchor();
+    const waveScale: any = micPosition.radius / 3.9;
+    drawFloor(s, cx, cy, cY, sY, micPosition, waveScale);
     frameDebugMark('floorMs');
     // Microphone waves follow the selected conversation partner's ground anchor.
     for (let i: any = 0; i < 96; i++) {
       const a: any = i / 96 * 6.283 + sp * .5,
         h: any = (.12 + sceneFoundationState.bars[i] * 3.2) * waveScale,
-        x: any = micAnchor.x + Math.cos(a) * micAnchor.radius,
-        z: any = micAnchor.z + Math.sin(a) * micAnchor.radius;
+         x: any = micPosition.x + Math.cos(a) * micPosition.radius,
+         z: any = micPosition.z + Math.sin(a) * micPosition.radius;
       for (let y: any = 0; y < h; y += .09) plot(x, y + .03, z, 2, 2, Math.min(3, 1 + (y / h * 3 | 0)));
     }
-    for (const r of sceneFoundationState.pulses) for (let a: any = 0; a < 6.283; a += .07) plot(micAnchor.x + Math.cos(a) * r * waveScale, .04, micAnchor.z + Math.sin(a) * r * waveScale, 1, 2, r < sceneFoundationState.SR * .5 ? 3 : 2);
+    for (const r of sceneFoundationState.pulses) for (let a: any = 0; a < 6.283; a += .07) plot(micPosition.x + Math.cos(a) * r * waveScale, .04, micPosition.z + Math.sin(a) * r * waveScale, 1, 2, r < sceneFoundationState.SR * .5 ? 3 : 2);
     // 3D hud: orbit ring ticks + satellites
     for (let a: any = 0; a < 64; a++) {
       const t: any = a / 64 * 6.283 - sceneFoundationState.tm * .4,
@@ -284,6 +282,7 @@ export function startFrameRenderer(): void {
     frameRendererState.hologramGlowMaterials.fill(0);
     frameRendererState.hologramGlowMaterials[1] = 1;
     holoRaster();
+    objects();
     frameDebugMark('hologramsObjectsScriptsMs');
     // depth-buffer edges: darker behind, warm rim on upper-left
     for (let y: any = 1; y < sceneFoundationState.H; y++) for (let x: any = 1; x < sceneFoundationState.W; x++) {

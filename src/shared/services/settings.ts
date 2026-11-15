@@ -39,7 +39,7 @@ export interface SettingsServices {
   importSkills(input: string): void;
   setSkill(name: string, enabled: boolean): void;
   deleteSkill(name: string): void;
-  importMcps(input: unknown): void;
+  importMcps(input: unknown): Promise<void>;
   setMcp(name: string, enabled: boolean): Promise<void>;
   deleteMcp(name: string): Promise<void>;
   reconnectMcp(name: string): Promise<void>;

@@ -1,9 +1,9 @@
-import { readPreference, writePreference } from '../persistence';
+import { flushPreferences, readPreference, writePreference } from '../persistence';
 /** settings-service: runtime implementation. */
 import { useRuntimeSettings, settingsChanged } from "../settings";
 import { listSessions, saveSession, sessionPlain } from './sessions';
 import { cleanAesthetics, profilesContextState, saveSouls, updateAgentProfile, updateSoulSettings } from './profiles-context';
-import { addMcps, addSkills, integrationsState, mcpConnect, parseSkill, renderMcp, renderSk, stopLocalMcp } from './integrations';
+import { addMcps, addSkills, deletePiMcp, integrationsState, parseSkill, refreshMcps, renderSk, setPiMcp } from './integrations';
 import { refreshVoices, stopVoiceDemo, testVoice } from './voice-preview';
 import { refreshCodeHost, scriptApiState } from './script-api';
 import { renderAg, rq } from './workspace-bridge';
@@ -39,10 +39,14 @@ export function connectSettings(): void {
       stopVoice: stopVoiceDemo,
       loadVoices: refreshVoices,
       testVoice,
-      setAgentDefaults: (patch?: any): any => {
+      setAgentDefaults: async (patch?: any): Promise<void> => {
         Object.assign(profilesContextState.ext, patch);
         profilesContextState.saveExt();
         if (patch.code === false) for (const c of scriptApiState.codeRequests) c.abort();
+        if (patch.code !== undefined) {
+          await flushPreferences();
+          await refreshCodeHost();
+        }
         settingsChanged();
       },
       setContext: (value?: any): any => {
@@ -129,37 +133,17 @@ export function connectSettings(): void {
         integrationsState.saveSK();
         renderSk();
       },
-      importMcps: (input?: any): any => {
-        if (!addMcps(input)) throw new Error('Each MCP server needs a name and HTTP(S) URL or a local command with string args');
+      importMcps: async (input?: any): Promise<void> => {
+        if (!await addMcps(input)) throw new Error('Each MCP server needs a name and HTTP(S) URL or a local command with string args');
       },
       setMcp: async (name?: any, on?: any): Promise<any> => {
-        const c: any = integrationsState.MC.find((c?: any): any => c.name === name);
-        if (!c) return;
-        c.on = on;
-        integrationsState.saveMC();
-        if (on) await mcpConnect(c);else {
-          await stopLocalMcp(c);
-          integrationsState.MS.delete(name);
-          renderMcp();
-        }
+        await setPiMcp(name, on);
       },
       deleteMcp: async (name?: any): Promise<any> => {
-        const c: any = integrationsState.MC.find((c?: any): any => c.name === name);
-        if (!c) return;
-        c.on = false;
-        await stopLocalMcp(c);
-        integrationsState.MS.delete(name);
-        integrationsState.MC = integrationsState.MC.filter((entry?: any): any => entry.name !== name);
-        integrationsState.saveMC();
-        renderMcp();
+        await deletePiMcp(name);
       },
       reconnectMcp: async (name?: any): Promise<any> => {
-        const c: any = integrationsState.MC.find((c?: any): any => c.name === name);
-        if (c && c.on !== false) {
-          await stopLocalMcp(c);
-          integrationsState.MS.delete(name);
-          await mcpConnect(c);
-        }
+        await refreshMcps();
       },
       setBackground: async (url?: any): Promise<any> => {
         await setStageBackground(url || null);

@@ -5,7 +5,6 @@ import { createWorkspace, connectDiagnostics } from './workspace';
 import { prepareSessions, restoreSessions } from './sessions';
 import { connectIntegrations } from './runtime/integrations';
 import { connectSettings } from './runtime/settings-service';
-import { exposeScriptApi } from './runtime/public-api';
 
 let startup: Promise<void> | undefined;
 
@@ -26,7 +25,6 @@ async function startRuntime(): Promise<void> {
     prepareSessions();
     connectDiagnostics();
     connectSettings();
-    exposeScriptApi();
 
     // Rendering starts only after its scene, agent and workspace dependencies exist.
     scene.start();

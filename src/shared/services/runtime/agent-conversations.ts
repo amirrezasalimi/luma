@@ -11,6 +11,7 @@ import { hologramControlsState } from './hologram-controls';
 import { drain } from './speech-playback';
 import { mainOrchestratorState } from './main-orchestrator';
 import { loadVoiceCatalog } from './voice-preview';
+import { checkpointConversation } from './workspace-history';
 import { fitPanel, stopPanelMove } from './panels-widgets';
 
 interface ModuleState {
@@ -219,9 +220,7 @@ export function dragPanel(n?: any): any {
 }
 
 // ---------------- 15a. Jarvis awareness + orchestrator directives ----------------
-export function connectAgentConversations(): void {
-  window.setTalk = setTalk;
-  window.selectAgentAtPointer = (e?: any): any => {
+export function selectAgentAtPointer(e?: any): any {
     const r: any = cameraInputState.V.getBoundingClientRect(),
       k: any = cameraInputState.V.width / r.width,
       x: any = (e.clientX - r.left) * k,
@@ -235,16 +234,18 @@ export function connectAgentConversations(): void {
     if (sceneFoundationState.mode === 'idle') tap();
     e.jarvisAgentSelected = true;
     return true;
-  };
-  window.agentTalk = (t?: any, target: any = sceneFoundationState.talkTo): any => {
+}
+export function agentTalk(t?: any, target: any = sceneFoundationState.talkTo): any {
     const a: any = profilesContextState.AG.get(target);
     if (!a) {
       return false;
     }
+    checkpointConversation(a.name + ' conversation turn');
     logAdd('user', '> ' + a.name + ': ' + t);
     tell(a, 'USER SAYS (spoken): ' + t + ' -- You are the selected conversation partner. Answer directly in one short speakable status line, then act if needed; call idle() when only conversing. Your status line is automatically spoken using your own voice: do not repeat it with speak_tts(), say(), or ask_main_agent().');
     return true;
-  };
+}
+export function connectAgentConversations(): void {
   agentConversationsState.ansW = (a?: any, t?: any): any => a.waiters.splice(0).forEach((f?: any): any => f(t));
   agentConversationsState.mq = Promise.resolve();
 }

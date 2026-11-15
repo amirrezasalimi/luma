@@ -1,4 +1,5 @@
 import { host } from '../host';
+import { updateScriptUI, useRuntimeUI } from '../../../stores/runtime-ui';
 /** script-api: runtime implementation. */
 import { saveSession, sessionsState } from './sessions';
 import { getAgentProfile, profileTarget, profilesContextState, updateAgentProfile, updateSoul, updateSoulSettings } from './profiles-context';
@@ -21,7 +22,6 @@ import { workspaceHistoryState } from './workspace-history';
 
 interface ModuleState {
   JT: any;
-  scriptManager: any;
   scriptManagerOwner: string;
   codeHost: any;
   codeRequests: any;
@@ -61,20 +61,18 @@ export function saveAgentScript(owner?: any, name?: any, source?: any): any {
 }
 export function openScriptManager(owner?: any): any {
   scriptApiState.scriptManagerOwner = owner;
-  delete scriptApiState.scriptManager.dataset.editNode;
-  sceneFoundationState.$('scriptManagerTitle').textContent = owner + ' · SCRIPTS';
-  sceneFoundationState.$('scriptManagerName').value = '';
-  sceneFoundationState.$('scriptManagerSource').value = '';
-  sceneFoundationState.$('scriptManagerStatus').textContent = 'Named scripts save with this session. Updating source restarts that script.';
+  updateScriptUI({ open: true, owner, editNode: null, name: '', source: '',
+    status: 'Named scripts save with this session. Updating source restarts that script.' });
   renderScriptManager();
-  if (!scriptApiState.scriptManager.open) scriptApiState.scriptManager.showModal();
 }
 export function renderScriptManager(): any {
   const owner: any = scriptApiState.scriptManagerOwner,
     rows: any = agentScripts(owner),
     a: any = mainOrchestratorState.findA(owner),
     tasks: any = a?.tms || scriptApiState.JT;
-  sceneFoundationState.$('scriptManagerList').innerHTML = '<p class="mut">Loose command callbacks: ' + tasks.size + ' (frame: ' + [...tasks].filter((t?: any): any => t.kind === 'frame').length + ', intervals: ' + [...tasks].filter((t?: any): any => t.kind === 'interval').length + '). These closures are not restored; use a named script for persistence.</p>' + rows.map((s?: any, i?: any): any => '<section class="ar"><b>' + profilesContextState.esc(s.name) + '</b> · ' + profilesContextState.esc(s.status) + ' · ' + s.callbacks + ' callbacks · ' + (s.autoResume ? 'auto-resume' : 'manual resume') + '<div class="bt">' + ['edit', 'stop', 'start', 'remove'].map((action?: any): any => '<button data-script-index="' + i + '" data-script-action="' + action + '">' + action.toUpperCase() + '</button>').join('') + '</div><details><summary>Source' + (s.error ? ' · ERROR' : '') + '</summary><pre style="white-space:pre-wrap;overflow:auto;max-height:240px">' + profilesContextState.esc(s.source) + (s.error ? '\nERROR: ' + profilesContextState.esc(s.error) : '') + '</pre></details></section>').join('');
+  updateScriptUI({ rows, callbacks: tasks.size,
+    frames: [...tasks].filter((t: any) => t.kind === 'frame').length,
+    intervals: [...tasks].filter((t: any) => t.kind === 'interval').length });
 }
 export function agentScripts(owner?: any): any {
   return [...profilesContextState.O.values()].flatMap((o?: any): any => o.scripts.filter((s?: any): any => s.by === owner).map((s?: any): any => ({
@@ -118,7 +116,7 @@ export async function refreshCodeHost(): Promise<any> {
 }
 export async function codeCall(op?: any, args: any = {}, ag: any = null): Promise<any> {
   if (!profilesContextState.ext.code) throw new Error('Code agent is disabled in Settings');
-  if (!scriptApiState.codeHost?.enabled) throw new Error('Host tools unavailable. Check Code Agent in Settings and enable JARVIS_CODE_AGENT=1 on the server.');
+  if (!scriptApiState.codeHost?.enabled) throw new Error('Host tools unavailable. Enable Code Agent in Settings.');
   const controller: any = new AbortController();
   scriptApiState.codeRequests.add(controller);
   const signal: any = ag?.ctl ? AbortSignal.any([controller.signal, ag.ctl.signal]) : controller.signal;
@@ -580,54 +578,38 @@ export function mkApi(x?: any): any {
 // ---- run an async JS snippet (agent / jarvis) in the scene API; resolves {ret,er,out}
 export function createScriptApi(): void {
   scriptApiState.JT = new Set();
-  scriptApiState.scriptManager = document.createElement('dialog');
-  scriptApiState.scriptManager.className = 'gimage-lightbox';
-  scriptApiState.scriptManager.innerHTML = '<h2 id="scriptManagerTitle">SCRIPTS</h2><div id="scriptManagerList"></div><h3>CREATE / REPLACE NAMED SCRIPT</h3><input id="scriptManagerName" placeholder="Script name"><textarea id="scriptManagerSource" rows="10" spellcheck="false" placeholder="function update(delta) { }"></textarea><p id="scriptManagerStatus" role="status"></p><div class="r"><button class="b" id="scriptManagerSave">SAVE & RUN</button><button class="b" id="scriptManagerStopCallbacks">STOP LOOSE CALLBACKS</button><button class="b" id="scriptManagerClose">CLOSE</button></div>';
-  document.body.append(scriptApiState.scriptManager);
   scriptApiState.scriptManagerOwner = 'jarvis';
-  sceneFoundationState.$('scriptManagerList').onclick = (e?: any): any => {
-    const button: any = e.target.closest('[data-script-action]');
-    if (!button) return;
-    const s: any = agentScripts(scriptApiState.scriptManagerOwner)[+button.dataset.scriptIndex];
-    if (!s) return;
-    try {
-      if (button.dataset.scriptAction === 'edit') {
-        sceneFoundationState.$('scriptManagerName').value = s.name;
-        sceneFoundationState.$('scriptManagerSource').value = s.source;
-        scriptApiState.scriptManager.dataset.editNode = s.nodeId;
-        return;
-      }
-      controlAgentScript(scriptApiState.scriptManagerOwner, s.nodeId, s.name, button.dataset.scriptAction);
-      renderScriptManager();
-    } catch (e: any) {
-      sceneFoundationState.$('scriptManagerStatus').textContent = e.message;
-    }
-  };
-  sceneFoundationState.$('scriptManagerSave').onclick = async (): Promise<any> => {
-    try {
-      const name: any = sceneFoundationState.$('scriptManagerName').value.trim();
-      if (!name) throw new Error('Enter a script name');
-      const node: any = profilesContextState.O.get(scriptApiState.scriptManager.dataset.editNode),
-        existing: any = node?.scripts.find((s?: any): any => s.name === name && s.by === scriptApiState.scriptManagerOwner);
-      if (existing) {
-        const s: any = attach(node, name, sceneFoundationState.$('scriptManagerSource').value, scriptApiState.scriptManagerOwner);
-        s.autoResume = true;
-      } else saveAgentScript(scriptApiState.scriptManagerOwner, name, sceneFoundationState.$('scriptManagerSource').value);
-      delete scriptApiState.scriptManager.dataset.editNode;
-      await saveSession(true);
-      renderScriptManager();
-      sceneFoundationState.$('scriptManagerStatus').textContent = sessionsState.sessionReady ? 'Saved to IndexedDB and started' : 'Started, but session storage is not ready';
-    } catch (e: any) {
-      sceneFoundationState.$('scriptManagerStatus').textContent = e.message;
-    }
-  };
-  sceneFoundationState.$('scriptManagerClose').onclick = (): any => scriptApiState.scriptManager.close();
-  sceneFoundationState.$('scriptManagerStopCallbacks').onclick = (): any => {
-    const tasks: any = mainOrchestratorState.findA(scriptApiState.scriptManagerOwner)?.tms || scriptApiState.JT;
-    for (const task of [...tasks]) task.c?.();
-    tasks.clear();
-    renderScriptManager();
-  };
   scriptApiState.codeHost = null;
   scriptApiState.codeRequests = new Set();
+}
+
+export async function saveScriptFromManager(): Promise<void> {
+  const { owner, name: draftName, source, editNode, saving } = useRuntimeUI.getState().scripts;
+  if (saving) return;
+  updateScriptUI({ saving: true });
+  try {
+    const name = draftName.trim();
+    if (!name) throw new Error('Enter a script name');
+    const node = profilesContextState.O.get(editNode);
+    const existing = node?.scripts.find((s: any) => s.name === name && s.by === owner);
+    if (existing) attach(node, name, source, owner).autoResume = true;
+    else saveAgentScript(owner, name, source);
+    await saveSession(true);
+    // Do not overwrite a newly opened owner's editor after an async save.
+    if (useRuntimeUI.getState().scripts.owner === owner) {
+      updateScriptUI({ editNode: null, status: sessionsState.sessionReady ? 'Saved to session storage and started' : 'Started, but session storage is not ready' });
+      renderScriptManager();
+    }
+  } catch (error) {
+    if (useRuntimeUI.getState().scripts.owner === owner) updateScriptUI({ status: error instanceof Error ? error.message : String(error) });
+  } finally {
+    updateScriptUI({ saving: false });
+  }
+}
+
+export function stopManagerCallbacks(): void {
+  const tasks = mainOrchestratorState.findA(scriptApiState.scriptManagerOwner)?.tms || scriptApiState.JT;
+  for (const task of [...tasks]) task.c?.();
+  tasks.clear();
+  renderScriptManager();
 }

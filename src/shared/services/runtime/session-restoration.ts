@@ -5,7 +5,7 @@ import { sceneFoundationState } from './scene-foundation';
 import { objectRendererState } from './object-renderer';
 import { holoApply, hologramControlsState, lblAct, logM } from './hologram-controls';
 import { profilesContextState } from './profiles-context';
-import { sceneHudState } from './scene-hud';
+import { logAdd, sceneHudState } from './scene-hud';
 import { addObj } from './scene-objects';
 import { addPanel, fitPanel, layoutPanels, movePanel, panelWidget, sizePanel } from './panels-widgets';
 import { addGui, gfail, guiNodesState, mkAct, setStageBackground } from './gui-nodes';
@@ -152,7 +152,7 @@ export function restoreSession(s?: any): any {
       hologramControlsState.mainArchiveCache.json = s.main.archiveJSON;
     }
     hologramControlsState.MAIN.open = s.main?.open ?? true;
-    for (const row of s.transcript || []) mainOrchestratorState._la(row.role || 'ai', String(row.text || ''));
+    for (const row of s.transcript || []) (mainOrchestratorState._la || logAdd)(row.role || 'ai', String(row.text || ''));
     [workspaceUiState.agp, workspaceUiState.tlp].forEach((n?: any, i?: any): any => n.classList.toggle('c', s.ui?.panels?.[i]?.collapsed ?? n === workspaceUiState.tlp));
     profilesContextState.oid = Math.max(profilesContextState.oid, s.counters?.oid || 0);
     profilesContextState.pid = Math.max(profilesContextState.pid, s.counters?.pid || 0);

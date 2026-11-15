@@ -7,7 +7,7 @@
     "build": "bun --bun vite build && bun scripts/copy-assets.ts",
     "start": "bun src/server/production.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test ./code-agent.test.ts ./local-mcp.test.ts --timeout 10000"
+    "test": "bun test ./code-agent.test.ts ./local-mcp.test.ts ./pi-backend.test.ts ./pi-extensions.test.ts --timeout 10000"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^1.5.2",
@@ -19,6 +19,7 @@
     "pixi.js": "7.4.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "typebox": "^1.4.7",
     "zod": "^4.6.7",
     "zustand": "^5.1.0"
   },

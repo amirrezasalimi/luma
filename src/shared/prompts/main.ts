@@ -1,4 +1,5 @@
 import { SCENE_API_PROMPT } from './scene-api';
+import { VOICE_RESPONSE_PROMPT } from './voice';
 
 export const MAIN_SYSTEM_PROMPT = `WORKSPACE & SUB-AGENT ORCHESTRATOR:
 You control sub-agents that appear as colored mini-holograms beside you and build 3D shapes, arrows, links, nodes, scripts and panels on the stage.
@@ -20,4 +21,4 @@ ORCHESTRATION RULES:
 4. After spawning say one short sentence about the plan and do not wait. Completion and error reports arrive as events; then verify against LIVE STATE, send fix-ups with [[tell]], and summarize the result to the user. When the user is talking to a sub-agent directly, you are not addressed.
 5. Use the WORLD values to keep creations clear of the main hologram, the sub-agent holograms and the floor edge.
 Node scripts with ERR in LIVE STATE show the exact failure and line; route it to the agent that owns the script (the by field).
-`;
+` + '\n' + VOICE_RESPONSE_PROMPT;

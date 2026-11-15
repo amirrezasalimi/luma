@@ -1,3 +1,4 @@
+import { rpc } from '../rpc';
 import { SCENE_API_PROMPT } from '../../prompts/scene-api';
 import { AGENT_SYSTEM_PROMPT } from '../../prompts/agent';
 import { extractJavaScript } from '../../utils/script';
@@ -252,9 +253,7 @@ export function parseJ(t?: any): any {
   }
 }
 export async function llm(a?: any): Promise<any> {
-  const url: any = (profilesContextState.ext.ae || sceneFoundationState.cfg.endpoint).replace(/\/$/, '') + '/chat/completions';
-  let r: any;
-  const system: any = AGENT_SYSTEM_PROMPT + soulContext(a) + integrationsState.extraCtx() + peerContext(a),
+  const system: any = AGENT_SYSTEM_PROMPT + integrationsState.extraCtx() + peerContext(a) + soulContext(a),
     history: any = a.messageArchive?.length ? [a.msgs[0], ...a.messageArchive, ...a.msgs.slice(1)].filter(Boolean) : a.msgs,
     messages: any = await prepareContext(system, history, a);
   a.debugRequest = {
@@ -269,46 +268,33 @@ export async function llm(a?: any): Promise<any> {
       content: system
     }, ...messages])
   };
-  try {
-    r = await fetch(url, {
-      signal: a.ctl.signal,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + (profilesContextState.ext.ak || sceneFoundationState.cfg.key)
-      },
-      body: JSON.stringify({
+  const events = await rpc.host.ai.chat({
+        endpoint: profilesContextState.ext.ae || sceneFoundationState.cfg.endpoint,
+        apiKey: profilesContextState.ext.ak || sceneFoundationState.cfg.key,
         model: a.model,
+        profile: a.name,
+        host_tools: !!profilesContextState.ext.code,
+        context_window: Number(profilesContextState.contextConfig.maxTokens) || 128000,
         ...(profilesContextState.ext.ar ? {
           reasoning_effort: profilesContextState.ext.ar
         } : {}),
-        stream: false,
         messages: [{
           role: 'system',
           content: system
         }, ...messages]
-      })
-    });
-  } catch (netErr: any) {
-    throw new Error(`Network/Fetch error (${url}): ${netErr.message || netErr}`);
+  }, { signal: a.ctl.signal });
+  let content: string | undefined;
+  for await (const event of events) {
+    if (event.type === 'complete') content = event.text;
+    if (event.type !== 'pi') continue;
+    const info = event.event;
+    if (info.type === 'soul_updated') updateAgentProfile(a, { soul: info.text });
+    if (info.type === 'tool_execution_start') logA(a, 'Pi tool: ' + info.toolName);
+    if (info.type === 'tool_execution_end') logA(a, 'Pi tool: ' + info.toolName + (info.isError ? ' failed' : ' completed'), !!info.isError);
+    if (info.type === 'extension_error') logA(a, info.message, true);
   }
-  if (!r.ok) {
-    let b: any = '';
-    try {
-      b = await r.text();
-    } catch (e: any) {}
-    let m: any = `HTTP ${r.status} (${r.statusText || 'Error'}) on model "${a.model}"`;
-    try {
-      const ej: any = JSON.parse(b);
-      if (ej.error?.message) m += `: ${ej.error.message}`;
-    } catch (e: any) {
-      if (b) m += `: ${b.slice(0, 120)}`;
-    }
-    throw new Error(m);
-  }
-  const data: any = await r.json();
-  if (!data?.choices?.[0]?.message) throw new Error(`Empty/Malformed LLM response from "${a.model}"`);
-  return data.choices[0].message.content || '';
+  if (content === undefined) throw new Error('Pi stream ended before completion');
+  return content;
 }
 export async function run(a?: any): Promise<any> {
   const runEpoch: any = hologramControlsState.workspaceEpoch;

@@ -1,9 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { RPCHandler } from '@orpc/server/fetch';
+import { SignalSyncHandlerPlugin } from '@orpc/server/plugins';
 import { router } from '../server/router';
 import { validateLocalRequest } from '../server/security';
 
-const handler = new RPCHandler(router);
+const handler = new RPCHandler(router, { plugins: [new SignalSyncHandlerPlugin()] });
 
 export const Route = createFileRoute('/rpc/$')({
   server: {

@@ -3,6 +3,7 @@ import * as PIXI from 'pixi.js';
 import { setEngine, setMute, voicePipelineState } from './voice-pipeline';
 import { sceneFoundationState } from './scene-foundation';
 import { proj } from './raster-primitives';
+import { checkpointFloorMessage } from './workspace-history';
 
 interface ModuleState {
   c3: any;
@@ -28,6 +29,7 @@ export function themeStep(): any {
   voicePipelineState.tcol = c[0] << 16 | c[1] << 8 | c[2];
 }
 export function logAdd(role?: any, text?: any): any {
+  checkpointFloorMessage(role, text);
   const t: any = new PIXI.Text((role === 'user' ? 'YOU' : 'JARVIS') + '\n' + text, {
     fontFamily: 'ui-monospace,Menlo,Consolas,monospace',
     fontSize: 18,

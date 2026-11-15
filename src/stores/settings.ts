@@ -21,7 +21,7 @@ export const DEFAULT_CONFIG: JarvisConfig = {
   key: '',
   model: 'gpt-4o-mini',
   reasoningEffort: '',
-  sys: 'You are JARVIS, a concise, witty AI assistant.',
+  sys: 'Be a concise, helpful assistant. Your personal identity is defined by your saved SOUL.md, not the application name.',
   tts: 'phonon-tts',
   voice: '',
   stt: 'whistle-webgpu',
@@ -36,6 +36,8 @@ export function parseConfig(raw: string | null): JarvisConfig {
     const saved: unknown = JSON.parse(raw || '{}');
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return { ...DEFAULT_CONFIG };
     const config = { ...DEFAULT_CONFIG, ...saved };
+    // Migrate only the exact former app default; preserve user-authored prompts.
+    if (config.sys === 'You are JARVIS, a concise, witty AI assistant.') config.sys = DEFAULT_CONFIG.sys;
     // Old files and manual edits must not turn controlled text fields into null/objects.
     for (const key of Object.keys(DEFAULT_CONFIG)) {
       if (typeof config[key] !== 'string') config[key] = DEFAULT_CONFIG[key];

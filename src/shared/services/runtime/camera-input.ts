@@ -51,7 +51,7 @@ export function bindCameraInput(): void {
     } else if (!sceneFoundationState.dragLock) sceneFoundationState.cam.yaw -= dx * .008;
   });
   cameraInputState.up = (e?: any): any => {
-    if (e.type === 'pointerup' && cameraInputState.ptr.has(e.pointerId) && cameraInputState.ptr.size === 1 && cameraInputState.moved < 6 && window.selectAgentAtPointer?.(e)) {
+    if (e.type === 'pointerup' && cameraInputState.ptr.has(e.pointerId) && cameraInputState.ptr.size === 1 && cameraInputState.moved < 6 && selectAgentAtPointer(e)) {
       cameraInputState.ptr.delete(e.pointerId);
       cameraInputState.V.style.cursor = 'grab';
       return;
@@ -86,3 +86,4 @@ export function bindCameraInput(): void {
   // 7. PROJECTION & PIXEL PRIMITIVES
   // ============================================================================
 }
+import { selectAgentAtPointer } from './agent-conversations';

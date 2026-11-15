@@ -1,5 +1,6 @@
 import { rpc } from '../rpc';
 import { flushPreferences } from '../persistence';
+import { useRuntimeUI } from '../../../stores/runtime-ui';
 /** sessions: runtime implementation. */
 import { useRuntimeSettings, settingsChanged } from "../settings";
 import { sceneFoundationState } from './scene-foundation';
@@ -40,18 +41,9 @@ export function sessionStatus(text?: any): any {
   useRuntimeSettings.setState({
     sessionStatus: text
   });
-  const warning: any = document.getElementById('session-storage-warning');
   if (/failed|unavailable|not being saved|blocked/i.test(text)) {
-    let notice: any = warning;
-    if (!notice) {
-      notice = document.createElement('div');
-      notice.id = 'session-storage-warning';
-      notice.setAttribute('role', 'alert');
-      notice.style.cssText = 'position:fixed;bottom:12px;left:12px;max-width:600px;z-index:99;padding:12px;background:#321020;color:#fff;border:1px solid #ff647c';
-      document.body.append(notice);
-    }
-    notice.textContent = text;
-  } else if (text.startsWith('Saved ')) warning?.remove();
+    useRuntimeUI.setState({ storageWarning: String(text) });
+  } else if (text.startsWith('Saved ')) useRuntimeUI.setState({ storageWarning: '' });
 }
 export async function commitSession(record: any): Promise<void> {
   await flushPreferences();

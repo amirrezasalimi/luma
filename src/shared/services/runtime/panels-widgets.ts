@@ -487,11 +487,9 @@ export function panelWidget(id?: any, value?: any): any {
 }
 // ---------------- 12d2. GUI nodes (live inside panels; nest with box/row/col) ----------------
 export function createPanelHost(): void {
-  panelsWidgetsState.pl = document.createElement('div');
-  panelsWidgetsState.pr = document.createElement('div');
-  panelsWidgetsState.pl.id = 'pl';
-  panelsWidgetsState.pr.id = 'pr';
-  document.body.append(panelsWidgetsState.pl, panelsWidgetsState.pr);
+  panelsWidgetsState.pl = document.getElementById('pl');
+  panelsWidgetsState.pr = document.getElementById('pr');
+  if (!panelsWidgetsState.pl || !panelsWidgetsState.pr) throw new Error('Workspace hosts are not mounted');
   panelsWidgetsState.CORN = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
   panelsWidgetsState.PANEL_PRESETS = {
     '2x2': [2, 2],

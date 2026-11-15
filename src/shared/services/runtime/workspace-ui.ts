@@ -113,12 +113,10 @@ export function renderAg(): any {
   }
 }
 export function createWorkspaceControls(): void {
-  workspaceUiState.agp = document.createElement('div');
+  workspaceUiState.agp = document.getElementById('agents-panel-host')!;
   mountAgentsPanel(workspaceUiState.agp);
-  panelsWidgetsState.pl.prepend(workspaceUiState.agp);
-  workspaceUiState.tlp = document.createElement('div');
+  workspaceUiState.tlp = document.getElementById('build-tools-host')!;
   mountBuildTools(workspaceUiState.tlp, profilesContextState.ext.step, profilesContextState.ext.notify);
-  panelsWidgetsState.pl.append(workspaceUiState.tlp);
   if (innerWidth < 700) workspaceUiState.tlp.classList.add('c');
   workspaceUiState.msg = (t?: any): any => profilesContextState.$$('#tlm').textContent = t;
   workspaceUiState.tlp.addEventListener('click', (event: MouseEvent) => {

@@ -1,6 +1,5 @@
 /** diagnostics: runtime implementation. */
 import * as PIXI from 'pixi.js';
-import { rasterPrimitivesState, saveHologramVisuals } from './raster-primitives';
 import { sceneFoundationState } from './scene-foundation';
 import { frameRendererState } from './frame-renderer';
 import { sessionStatus, sessionsState } from './sessions';
@@ -10,14 +9,9 @@ import { hologramControlsState } from './hologram-controls';
 import { scriptApiState } from './script-api';
 import { guiNodesState } from './gui-nodes';
 import { objectRendererState } from './object-renderer';
+import { updateDebugUI, useRuntimeUI } from '../../../stores/runtime-ui';
 
 interface ModuleState {
-  debugPanel: any;
-  debugVisualSection: any;
-  debugVisualLegend: any;
-  debugVisualInputs: any;
-  debugVisualNote: any;
-  debugVisualReset: any;
   debugStarted: number;
   debugAgentSince: any;
   debugExpanded: any;
@@ -243,21 +237,7 @@ export function debugMemoryText(): any {
   const m: any = performance.memory;
   return (m ? 'JS heap used: ' + diagnosticsState.debugBytes(m.usedJSHeapSize) + ' · allocated: ' + diagnosticsState.debugBytes(m.totalJSHeapSize) + ' · limit: ' + diagnosticsState.debugBytes(m.jsHeapSizeLimit) : 'JS heap memory: unavailable in this browser') + '\nPage memory (browser-reported): ' + (diagnosticsState.debugPageMemory ? diagnosticsState.debugBytes(diagnosticsState.debugPageMemory.bytes) + ' · measured ' + new Date(diagnosticsState.debugPageMemory.at).toLocaleTimeString() : 'not measured / unsupported');
 }
-export function debugContextView(request?: any): any {
-  const pre: any = document.createElement('pre');
-  pre.dataset.requestContext = 'true';
-  pre.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:340px;overflow:auto;background:rgba(0,0,0,.18);padding:8px';
-  pre.textContent = request ? JSON.stringify(request.messages, null, 2) : 'No captured request yet. Context is captured when the next LLM request is sent.';
-  return pre;
-}
-export function updateDebugProfile(details?: any, row?: any): any {
-  let pre: any = details.querySelector('[data-agent-profile]');
-  if (!pre) {
-    pre = document.createElement('pre');
-    pre.dataset.agentProfile = 'true';
-    pre.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:340px;overflow:auto;background:rgba(0,0,0,.18);padding:8px';
-    details.append(pre);
-  }
+export function debugProfileText(row?: any): string {
   const agent: any = row.id === 'main' ? null : profilesContextState.AG.get(row.id),
     profile: any = getAgentProfile(agent),
     saved: any = agent ? profilesContextState.soulProfile(agent.name) : null,
@@ -277,16 +257,10 @@ export function updateDebugProfile(details?: any, row?: any): any {
       }),
       contextSettings: profilesContextState.contextConfig
     }, null, 2);
-  if (pre.textContent !== text) {
-    const top: any = pre.scrollTop,
-      left: any = pre.scrollLeft;
-    pre.textContent = text;
-    pre.scrollTop = top;
-    pre.scrollLeft = left;
-  }
+  return text;
 }
 export function renderDebug(): any {
-  if (diagnosticsState.debugPanel.hidden) return;
+  if (!useRuntimeUI.getState().debug.open) return;
   const now: any = performance.now(),
     gap: any = Math.max(0, now - diagnosticsState.debugLastTick - 250);
   diagnosticsState.debugLastTick = now;
@@ -296,14 +270,17 @@ export function renderDebug(): any {
     longCount: any = diagnosticsState.debugLongCount;
   diagnosticsState.debugLongMs = 0;
   diagnosticsState.debugLongCount = 0;
-  sceneFoundationState.$('debugMetrics').textContent = 'Page uptime: ' + diagnosticsState.debugDuration(now - diagnosticsState.debugStarted) + ' · FPS: ' + diagnosticsState.debugFps.toFixed(1) + ' · renderer: ' + (sceneFoundationState.app.renderer.type === 1 ? 'WebGL' : 'Canvas') + '\nAgents: ' + profilesContextState.AG.size + ' (' + [...profilesContextState.AG.values()].filter((a?: any): any => a.status === 'running').length + ' running) · objects: ' + profilesContextState.O.size + ' · panels: ' + profilesContextState.PN.size + ' · GUI nodes: ' + guiNodesState.GU.size + '\nSession: ' + (sessionsState.activeSession?.name || 'loading') + ' · context: ' + profilesContextState.contextConfig.strategy + ' · capacity: ' + profilesContextState.contextConfig.maxTokens.toLocaleString() + ' estimated tokens';
-  sceneFoundationState.$('debugLoad').textContent = 'Timer delay: ' + gap.toFixed(1) + ' ms · delay ratio: ' + Math.min(100, gap / 250 * 100).toFixed(1) + '% · observed long tasks this sample: ' + longCount + ' / ' + longMs.toFixed(0) + ' ms' + (diagnosticsState.debugObserver ? '' : ' (Long Tasks API unavailable)');
-  sceneFoundationState.$('debugMemory').textContent = debugMemoryText();
+  updateDebugUI({
+    metrics: 'Page uptime: ' + diagnosticsState.debugDuration(now - diagnosticsState.debugStarted) + ' · FPS: ' + diagnosticsState.debugFps.toFixed(1) + ' · renderer: ' + (sceneFoundationState.app.renderer.type === 1 ? 'WebGL' : 'Canvas') + '\nAgents: ' + profilesContextState.AG.size + ' (' + [...profilesContextState.AG.values()].filter((a?: any): any => a.status === 'running').length + ' running) · objects: ' + profilesContextState.O.size + ' · panels: ' + profilesContextState.PN.size + ' · GUI nodes: ' + guiNodesState.GU.size + '\nSession: ' + (sessionsState.activeSession?.name || 'loading') + ' · context: ' + profilesContextState.contextConfig.strategy + ' · capacity: ' + profilesContextState.contextConfig.maxTokens.toLocaleString() + ' estimated tokens',
+    load: 'Timer delay: ' + gap.toFixed(1) + ' ms · delay ratio: ' + Math.min(100, gap / 250 * 100).toFixed(1) + '% · observed long tasks this sample: ' + longCount + ' / ' + longMs.toFixed(0) + ' ms' + (diagnosticsState.debugObserver ? '' : ' (Long Tasks API unavailable)'),
+    memory: debugMemoryText(),
+  });
   const canvas: any = sceneFoundationState.$('debugWave'),
     ctx: any = canvas.getContext('2d'),
     w: any = canvas.width,
     h: any = canvas.height,
-    colors: any = getComputedStyle(diagnosticsState.debugPanel);
+    colors: any = getComputedStyle(canvas);
+  if (!ctx) return;
   ctx.clearRect(0, 0, w, h);
   ctx.strokeStyle = colors.getPropertyValue('--line').trim() || '#777';
   ctx.lineWidth = 1;
@@ -322,7 +299,6 @@ export function renderDebug(): any {
     if (i) ctx.lineTo(x, y);else ctx.moveTo(x, y);
   });
   ctx.stroke();
-  const root: any = sceneFoundationState.$('debugAgents');
   const rows: any = [{
     id: 'main',
     name: 'JARVIS',
@@ -347,100 +323,31 @@ export function renderDebug(): any {
     step: a.step,
     limit: a.unlimited ? '∞' : profilesContextState.agentLimit(a)
   }))];
-  for (const row of rows) {
+  updateDebugUI({ agents: rows.map((row: any) => {
     if (!diagnosticsState.debugAgentSince.has(row.id)) diagnosticsState.debugAgentSince.set(row.id, row.onlineSince ? now - (Date.now() - row.onlineSince) : now);
-    let details: any = Array.from(root.children).find((n?: any): any => n.dataset.agentId === row.id);
-    if (details) {
-      const title: any = details.querySelector('summary'),
-        info: any = details.querySelector('p');
-      title.textContent = row.name + ' · ' + row.status + ' · ' + row.model + (row.muted ? ' · muted' : '');
-      const counts: any = {};
-      for (const message of row.messages || []) counts[message.role] = (counts[message.role] || 0) + 1;
-      const req: any = row.request,
-        token: any = req?.estimatedTokens;
-      info.textContent = 'Online this page: ' + diagnosticsState.debugDuration(now - (row.id === 'main' ? diagnosticsState.debugStarted : diagnosticsState.debugAgentSince.get(row.id))) + ' · messages: ' + row.messages.length + ' · archived: ' + row.archive.length + '\nRoles: ' + JSON.stringify(counts) + (row.step !== undefined ? ' · turns: ' + row.step + '/' + row.limit : '') + '\nLast sent context: ' + (req ? req.messages.length + ' messages · ~' + token.toLocaleString() + ' tokens (' + (token / profilesContextState.contextConfig.maxTokens * 100).toFixed(1) + '%) · ' + new Date(req.at).toLocaleTimeString() : 'not captured yet') + '\nCompacted: ' + (row.summary?.count || 0) + ' messages' + (row.summary?.summary ? ' · summary ' + row.summary.summary.length + ' chars' : '');
-      if (details.open) {
-        updateDebugProfile(details, row);
-        let pre: any = details.querySelector('[data-request-context]');
-        if (!pre) {
-          pre = debugContextView(row.request);
-          details.append(pre);
-        }
-        const text: any = row.request ? JSON.stringify(row.request.messages, null, 2) : 'No captured request yet. Context is captured when the next LLM request is sent.';
-        if (pre.textContent !== text) {
-          const top: any = pre.scrollTop,
-            left: any = pre.scrollLeft;
-          pre.textContent = text;
-          pre.scrollTop = top;
-          pre.scrollLeft = left;
-        }
-        let summaryPre: any = details.querySelector('[data-compaction]');
-        if (!summaryPre && row.summary?.summary) {
-          summaryPre = document.createElement('pre');
-          summaryPre.dataset.compaction = 'true';
-          summaryPre.style.cssText = 'white-space:pre-wrap;max-height:180px;overflow:auto';
-          details.append(summaryPre);
-        }
-        if (summaryPre) {
-          const text: any = row.summary?.summary ? 'COMPACTION SUMMARY\n' + row.summary.summary : '';
-          summaryPre.hidden = !text;
-          if (summaryPre.textContent !== text) {
-            const top: any = summaryPre.scrollTop;
-            summaryPre.textContent = text;
-            summaryPre.scrollTop = top;
-          }
-        }
-      }
-      continue;
-    }
-    details = document.createElement('details');
-    details.dataset.agentId = row.id;
-    const title: any = document.createElement('summary'),
-      info: any = document.createElement('p');
-    details.open = diagnosticsState.debugExpanded.has(row.id);
-    details.style.cssText = 'border-top:1px solid var(--line);padding:10px 0';
-    title.textContent = row.name + ' · ' + row.status + ' · ' + row.model + (row.muted ? ' · muted' : '');
-    title.style.cursor = 'pointer';
-    details.addEventListener('toggle', (): any => {
-      if (!details.isConnected) return;
-      if (details.open) diagnosticsState.debugExpanded.add(row.id);else diagnosticsState.debugExpanded.delete(row.id);
-    });
     const counts: any = {};
     for (const m of row.messages || []) counts[m.role] = (counts[m.role] || 0) + 1;
     const req: any = row.request,
       token: any = req?.estimatedTokens;
-    info.style.cssText = 'white-space:pre-wrap;line-height:1.6';
-    info.textContent = 'Online this page: ' + diagnosticsState.debugDuration(now - (row.id === 'main' ? diagnosticsState.debugStarted : diagnosticsState.debugAgentSince.get(row.id))) + ' · messages: ' + row.messages.length + ' · archived: ' + row.archive.length + '\nRoles: ' + JSON.stringify(counts) + (row.step !== undefined ? ' · turns: ' + row.step + '/' + row.limit : '') + '\nLast sent context: ' + (req ? req.messages.length + ' messages · ~' + token.toLocaleString() + ' tokens (' + (token / profilesContextState.contextConfig.maxTokens * 100).toFixed(1) + '%) · ' + new Date(req.at).toLocaleTimeString() : 'not captured yet') + '\nCompacted: ' + (row.summary?.count || 0) + ' messages' + (row.summary?.summary ? ' · summary ' + row.summary.summary.length + ' chars' : '');
-    details.append(title, info);
-    if (details.open) {
-      updateDebugProfile(details, row);
-      details.append(debugContextView(req));
-      if (row.summary?.summary) {
-        const pre: any = document.createElement('pre');
-        pre.style.cssText = 'white-space:pre-wrap;max-height:180px;overflow:auto';
-        pre.dataset.compaction = 'true';
-        pre.textContent = 'COMPACTION SUMMARY\n' + row.summary.summary;
-        details.append(pre);
-      }
-    }
-    details.addEventListener('click', (e?: any): any => {
-      if (e.target === title) setTimeout((): any => {
-        if (details.open) diagnosticsState.debugExpanded.add(row.id);else diagnosticsState.debugExpanded.delete(row.id);
-        if (!diagnosticsState.debugPanel.hidden) renderDebugDetailsOnly();
-      }, 0);
-    });
-    root.append(details);
-  }
-  for (const node of Array.from<HTMLElement>(root.children)) if (!rows.some((row?: any): any => row.id === node.dataset.agentId)) node.remove();
+    const expanded = diagnosticsState.debugExpanded.has(row.id);
+    return {
+      id: row.id,
+      title: row.name + ' · ' + row.status + ' · ' + row.model + (row.muted ? ' · muted' : ''),
+      info: 'Online this page: ' + diagnosticsState.debugDuration(now - (row.id === 'main' ? diagnosticsState.debugStarted : diagnosticsState.debugAgentSince.get(row.id))) + ' · messages: ' + row.messages.length + ' · archived: ' + row.archive.length + '\nRoles: ' + JSON.stringify(counts) + (row.step !== undefined ? ' · turns: ' + row.step + '/' + row.limit : '') + '\nLast sent context: ' + (req ? req.messages.length + ' messages · ~' + token.toLocaleString() + ' tokens (' + (token / profilesContextState.contextConfig.maxTokens * 100).toFixed(1) + '%) · ' + new Date(req.at).toLocaleTimeString() : 'not captured yet') + '\nCompacted: ' + (row.summary?.count || 0) + ' messages' + (row.summary?.summary ? ' · summary ' + row.summary.summary.length + ' chars' : ''),
+      profile: expanded ? debugProfileText(row) : '',
+      context: expanded ? req ? JSON.stringify(req.messages, null, 2) : 'No captured request yet. Context is captured when the next LLM request is sent.' : '',
+      summary: expanded && row.summary?.summary ? 'COMPACTION SUMMARY\n' + row.summary.summary : '',
+    };
+  }) });
 }
 export function renderDebugDetailsOnly(): any {
   diagnosticsState.debugLastTick = performance.now() - 250;
   renderDebug();
 }
 export function toggleDebug(force?: any): any {
-  const open: any = force ?? diagnosticsState.debugPanel.hidden;
-  if (open && !diagnosticsState.debugPanel.hidden) return;
-  diagnosticsState.debugPanel.hidden = !open;
+  const open: boolean = force ?? !useRuntimeUI.getState().debug.open;
+  if (open && useRuntimeUI.getState().debug.open) return;
+  updateDebugUI({ open });
   frameRendererState.frameDebug.enabled = open;
   if (open) {
     frameRendererState.frameDebug.samples = [];
@@ -482,70 +389,6 @@ export function toggleDebug(force?: any): any {
   }
 }
 export function createDiagnostics(): void {
-  diagnosticsState.debugPanel = document.createElement('section');
-  diagnosticsState.debugPanel.id = 'debug-panel';
-  diagnosticsState.debugPanel.hidden = true;
-  diagnosticsState.debugPanel.setAttribute('aria-label', 'Runtime debug panel');
-  diagnosticsState.debugPanel.style.cssText = 'position:fixed;right:14px;top:14px;width:min(650px,95vw);max-height:calc(100dvh - 28px);overflow:auto;z-index:20;background:var(--card);color:var(--fg);border:2px solid var(--acc2);padding:14px;box-shadow:4px 4px 0 var(--acc);font:11px ui-monospace,monospace';
-  diagnosticsState.debugPanel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="font-size:14px;margin:0">DEBUG · D</h2><div><button id="debugCopy" class="b" type="button">COPY DEBUG REPORT</button> <button id="debugClose" class="b" type="button">CLOSE</button></div></div><p id="debugCopyStatus" role="status" class="mut"></p><p id="debugMetrics" style="white-space:pre-wrap;line-height:1.7"></p><p style="margin-bottom:4px">Main-thread delay/load proxy — not OS CPU usage</p><canvas id="debugWave" width="600" height="90" style="display:block;width:100%;height:90px;border:1px solid var(--line)"></canvas><p id="debugLoad" class="mut"></p><p id="debugMemory" style="white-space:pre-wrap"></p><button id="debugMeasure" class="b" type="button">MEASURE PAGE MEMORY</button><p class="mut">Heap memory is Chromium-only and excludes GPU/native allocations. Page-memory measurement requires browser support and cross-origin isolation. Actual CPU/process RAM are not available to normal browser JavaScript.</p><div id="debugAgents"></div>';
-  document.body.append(diagnosticsState.debugPanel);
-  diagnosticsState.debugVisualSection = document.createElement('fieldset');
-  diagnosticsState.debugVisualSection.style.cssText = 'border:1px solid var(--line);margin:12px 0;padding:10px';
-  diagnosticsState.debugVisualLegend = document.createElement('legend');
-  diagnosticsState.debugVisualLegend.textContent = 'HOLOGRAM VISUALS · live, saved across reloads';
-  diagnosticsState.debugVisualSection.append(diagnosticsState.debugVisualLegend);
-  diagnosticsState.debugVisualInputs = [];
-  for (const [key, label, min, max, step] of [['lineWidth', 'Line width (raster pixels)', 1, 4, 1], ['lineDensity', 'Line density', 0, 1, .05], ['fade', 'Line fade (0 = uniform, 1 = normal)', 0, 1, .05], ['darkShading', 'Main dark shading (0 = off, 1 = normal)', 0, 2, .05], ['hueGradient', 'Main color mix (0 = off)', 0, 1, .05], ['mainCoreScale', 'Main core sphere size', .25, 2, .05], ['agentCount', 'Sub-agent orbiting particle count', 0, 16, 1]]) {
-    const row: any = document.createElement('label'),
-      name: any = document.createElement('span'),
-      input: any = document.createElement('input'),
-      value: any = document.createElement('output');
-    row.style.cssText = 'display:grid;grid-template-columns:1fr 140px 35px;gap:8px;align-items:center;margin:8px 0';
-    name.textContent = label;
-    input.type = 'range';
-    input.min = min;
-    input.max = max;
-    input.step = step;
-    input.value = rasterPrimitivesState.holoDebugVisuals[key];
-    input.setAttribute('aria-label', label);
-    value.textContent = input.value;
-    input.oninput = (): any => {
-      rasterPrimitivesState.holoDebugVisuals[key] = Number(input.value);
-      value.textContent = input.value;
-    };
-    input.onchange = (): any => {
-      diagnosticsState.debugVisualLegend.textContent = saveHologramVisuals() ? 'HOLOGRAM VISUALS · live, saved across reloads' : 'HOLOGRAM VISUALS · storage unavailable, changes not saved';
-    };
-    row.append(name, input, value);
-    diagnosticsState.debugVisualSection.append(row);
-    diagnosticsState.debugVisualInputs.push({
-      key,
-      input,
-      value
-    });
-  }
-  diagnosticsState.debugVisualNote = document.createElement('p');
-  diagnosticsState.debugVisualNote.className = 'mut';
-  diagnosticsState.debugVisualNote.textContent = 'Line settings affect main and sub-agent holograms. Core size controls the main sphere; particle count leaves the solid sub-agent core intact. Sub-agent count is an offset from the default of 3, preserving per-agent customization.';
-  diagnosticsState.debugVisualSection.append(diagnosticsState.debugVisualNote);
-  diagnosticsState.debugVisualReset = document.createElement('button');
-  diagnosticsState.debugVisualReset.type = 'button';
-  diagnosticsState.debugVisualReset.className = 'b';
-  diagnosticsState.debugVisualReset.textContent = 'RESET HOLOGRAM VISUALS';
-  diagnosticsState.debugVisualReset.onclick = (): any => {
-    Object.assign(rasterPrimitivesState.holoDebugVisuals, rasterPrimitivesState.holoDebugDefaults);
-    diagnosticsState.debugVisualLegend.textContent = saveHologramVisuals() ? 'HOLOGRAM VISUALS · live, saved across reloads' : 'HOLOGRAM VISUALS · storage unavailable, changes not saved';
-    for (const {
-      key,
-      input,
-      value
-    } of diagnosticsState.debugVisualInputs) {
-      input.value = rasterPrimitivesState.holoDebugVisuals[key];
-      value.textContent = input.value;
-    }
-  };
-  diagnosticsState.debugVisualSection.append(diagnosticsState.debugVisualReset);
-  sceneFoundationState.$('debugMetrics').before(diagnosticsState.debugVisualSection);
   diagnosticsState.debugStarted = 0;
   diagnosticsState.debugAgentSince = new Map();
   diagnosticsState.debugExpanded = new Set();
@@ -561,7 +404,7 @@ export function createDiagnostics(): void {
   diagnosticsState.debugPageMemory = null;
   diagnosticsState.debugMemoryBusy = false;
   sceneFoundationState.app.ticker.add((): any => {
-    if (diagnosticsState.debugPanel.hidden) return;
+    if (!useRuntimeUI.getState().debug.open) return;
     diagnosticsState.debugFrames++;
     const now: any = performance.now();
     if (now - diagnosticsState.debugLastFrame >= 1000) {
@@ -582,76 +425,6 @@ export function createDiagnostics(): void {
   sceneFoundationState.app.ticker.add((): any => {
     if (frameRendererState.frameDebug.enabled && frameRendererState.frameDebug.samples.length) frameRendererState.frameDebug.samples[frameRendererState.frameDebug.samples.length - 1].pixiRenderCpuMs = performance.now() - diagnosticsState.debugRenderStart;
   }, null, -26);
-  sceneFoundationState.$('debugCopy').onclick = async (): Promise<any> => {
-    const button: any = sceneFoundationState.$('debugCopy'),
-      status: any = sceneFoundationState.$('debugCopyStatus');
-    button.disabled = true;
-    try {
-      status.textContent = 'Collecting snapshot structure diagnostics…';
-      const snapshotBreakdown: any = await debugSnapshotBreakdown(),
-        report: any = buildDebugReport();
-      report.session.snapshotBreakdown = snapshotBreakdown;
-      const text: any = JSON.stringify(report, null, 2);
-      try {
-        if (!navigator.clipboard?.writeText) throw Error('Clipboard unavailable');
-        await navigator.clipboard.writeText(text);
-        status.textContent = 'Copied debug report. Paste it into the chat.';
-      } catch (e: any) {
-        const area: any = document.createElement('textarea');
-        area.value = text;
-        area.readOnly = true;
-        area.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0';
-        diagnosticsState.debugPanel.append(area);
-        area.select();
-        const copied: any = document.execCommand('copy');
-        area.remove();
-        button.focus();
-        if (copied) status.textContent = 'Copied debug report. Paste it into the chat.';else {
-          let output: any = sceneFoundationState.$('debugReportFallback');
-          if (!output) {
-            output = document.createElement('textarea');
-            output.id = 'debugReportFallback';
-            output.readOnly = true;
-            output.style.cssText = 'width:100%;height:180px';
-            status.after(output);
-          }
-          output.hidden = false;
-          output.value = text;
-          output.focus();
-          output.select();
-          status.textContent = 'Clipboard blocked. Copy the selected report manually.';
-        }
-      }
-    } catch (e: any) {
-      status.textContent = 'Could not build report: ' + e.message;
-    } finally {
-      button.disabled = false;
-    }
-  };
-  sceneFoundationState.$('debugClose').onclick = (): any => toggleDebug(false);
-  sceneFoundationState.$('debugMeasure').onclick = async (): Promise<any> => {
-    if (diagnosticsState.debugMemoryBusy) return;
-    if (typeof performance.measureUserAgentSpecificMemory !== 'function') {
-      sessionStatus('Page memory API is unavailable: requires a supported browser and cross-origin isolation');
-      sceneFoundationState.$('debugMemory').textContent = debugMemoryText() + '\nPage memory API unavailable (supported browser + cross-origin isolation required).';
-      return;
-    }
-    diagnosticsState.debugMemoryBusy = true;
-    sceneFoundationState.$('debugMeasure').disabled = true;
-    try {
-      const result: any = await performance.measureUserAgentSpecificMemory();
-      diagnosticsState.debugPageMemory = {
-        bytes: result.bytes,
-        at: Date.now()
-      };
-      sceneFoundationState.$('debugMemory').textContent = debugMemoryText();
-    } catch (e: any) {
-      sceneFoundationState.$('debugMemory').textContent = debugMemoryText() + '\nMeasurement failed: ' + e.message;
-    } finally {
-      diagnosticsState.debugMemoryBusy = false;
-      sceneFoundationState.$('debugMeasure').disabled = false;
-    }
-  };
   addEventListener('keydown', (e?: any): any => {
     if (e.key.toLowerCase() !== 'd' || e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.isComposing || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable || document.querySelector('dialog[open]')) return;
     e.preventDefault();
@@ -659,4 +432,28 @@ export function createDiagnostics(): void {
   });
 
   // Last ten workspace action snapshots, separate from IndexedDB session history.
+}
+
+export async function collectDebugReport(): Promise<string> {
+  const snapshotBreakdown = await debugSnapshotBreakdown();
+  const report = buildDebugReport();
+  report.session.snapshotBreakdown = snapshotBreakdown;
+  return JSON.stringify(report, null, 2);
+}
+
+export async function measureDebugMemory(): Promise<string> {
+  if (typeof performance.measureUserAgentSpecificMemory !== 'function') {
+    sessionStatus('Page memory API is unavailable: requires a supported browser and cross-origin isolation');
+    return debugMemoryText() + '\nPage memory API unavailable (supported browser + cross-origin isolation required).';
+  }
+  diagnosticsState.debugMemoryBusy = true;
+  try {
+    const result = await performance.measureUserAgentSpecificMemory();
+    diagnosticsState.debugPageMemory = { bytes: result.bytes, at: Date.now() };
+    return debugMemoryText();
+  } catch (error) {
+    return debugMemoryText() + '\nMeasurement failed: ' + (error instanceof Error ? error.message : String(error));
+  } finally {
+    diagnosticsState.debugMemoryBusy = false;
+  }
 }

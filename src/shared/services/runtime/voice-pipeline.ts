@@ -1,10 +1,17 @@
 /** voice-pipeline: runtime implementation. */
+import { rpc } from '../rpc';
+import { useRuntimeSettings } from '../settings';
+import { checkpointConversation } from './workspace-history';
+import { logMainMessage, mainSystemPrompt } from './main-orchestrator';
+import { prepareMainMessages, profileMuted, profileVoice, profilesContextState, updateSoul } from './profiles-context';
+import { agentTalk } from './agent-conversations';
+import { hologramControlsState, logM } from './hologram-controls';
 import { useSettingsStore, saveSettings } from "../../../stores/settings";
 import { sceneFoundationState } from './scene-foundation';
 import { logAdd } from './scene-hud';
 import { drain, stopSpeech } from './speech-playback';
 import { resolveVoice, stopVoiceDemo } from './voice-preview';
-import { setBuildToolsVisible } from './workspace-bridge';
+import { setBuildToolsVisible, workspaceUiState } from './workspace-bridge';
 
 interface ModuleState {
   pAn: any;
@@ -26,6 +33,7 @@ interface ModuleState {
   nf: number;
   vc: number;
   lastLive: number;
+  lastLiveText: string;
   liveBusy: boolean;
   rec: any;
   wq: any;
@@ -76,6 +84,44 @@ export function debounceSTT(text: any = ''): any {
     if (sceneFoundationState.mode === 'listening' && !voicePipelineState.busy && !voicePipelineState.muted && !voicePipelineState.junk(t)) userText(t);
   }, voicePipelineState.STT_DEBOUNCE_MS);
 }
+export function commitListening(): boolean {
+  if (sceneFoundationState.mode !== 'listening' || voicePipelineState.busy) return false;
+  const pendingText: string = (voicePipelineState.sttPending || voicePipelineState.lastLiveText || '').trim();
+  if (pendingText && !voicePipelineState.junk(pendingText)) {
+    clearSTTDebounce();
+    voicePipelineState.lastLiveText = '';
+    userText(pendingText);
+    return true;
+  }
+  if (voicePipelineState.chunks && voicePipelineState.chunks.length > 0) {
+    const a: any = voicePipelineState.cat(voicePipelineState.chunks);
+    voicePipelineState.chunks = [];
+    voicePipelineState.talking = false;
+    voicePipelineState.quiet = 0;
+    voicePipelineState.vc = 0;
+    voicePipelineState.lastLiveText = '';
+    if (a.length > 0) {
+      turn(a);
+      return true;
+    }
+  }
+  const targetId: any = sceneFoundationState.talkTo;
+  const targetInput: HTMLInputElement | null = document.querySelector<HTMLInputElement>(targetId ? `input[data-t="${targetId}"]` : 'input[data-t="main"]');
+  if (targetInput && targetInput.value.trim()) {
+    const val: string = targetInput.value.trim();
+    targetInput.value = '';
+    targetInput.blur();
+    userText(val, true);
+    return true;
+  }
+  if (targetInput) {
+    workspaceUiState.agp?.classList.remove('c');
+    targetInput.focus();
+    sceneFoundationState.lab.text = 'TYPE MESSAGE + ENTER';
+    return true;
+  }
+  return false;
+}
 export
 // VAD with adaptive noise floor + minimum voiced length; live text every ~1.3 s
 function startVAD(src?: any): any {
@@ -106,7 +152,10 @@ function startVAD(src?: any): any {
         voicePipelineState.liveBusy = true;
         const id: any = voicePipelineState.turnId;
         stt(voicePipelineState.cat(voicePipelineState.chunks)).then((t?: any): any => {
-          if (id === voicePipelineState.turnId && voicePipelineState.talking && t) sceneFoundationState.lab.text = '> ' + t.trim().slice(-58);
+          if (id === voicePipelineState.turnId && voicePipelineState.talking && t) {
+            voicePipelineState.lastLiveText = t.trim();
+            sceneFoundationState.lab.text = '> ' + t.trim().slice(-58);
+          }
         }).catch((): any => {}).finally((): any => {
           voicePipelineState.liveBusy = false;
         });
@@ -169,8 +218,9 @@ export async function ask(text?: any, id: any = voicePipelineState.turnId): Prom
       role: 'user',
       content: text
     };
+  checkpointConversation('main conversation turn');
   voicePipelineState.hist.push(user);
-  logAdd('user', text);
+  logMainMessage('user', text);
   sceneFoundationState.lab.text = 'THINKING...';
   const q: any = [],
     speech: any = streamSpeech();
@@ -178,7 +228,6 @@ export async function ask(text?: any, id: any = voicePipelineState.turnId): Prom
     sp: any = null,
     full: any = '',
     sb: any = '',
-    buf: any = '',
     committed: any = false;
   const enqueue: any = (t?: any, final: any = false): any => {
     sb += speech(t, final);
@@ -216,56 +265,37 @@ export async function ask(text?: any, id: any = voicePipelineState.turnId): Prom
     sp.catch((): any => {});
   };
   try {
-    const r: any = await fetch(sceneFoundationState.cfg.endpoint.replace(/\/$/, '') + '/chat/completions', {
-      signal,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + sceneFoundationState.cfg.key
-      },
-      body: JSON.stringify({
+    const messages = [{ role: 'system', content: mainSystemPrompt() }, ...await prepareMainMessages(voicePipelineState.hist)];
+    hologramControlsState.MAIN.debugRequest = { at: Date.now(), model: sceneFoundationState.cfg.model, messages, estimatedTokens: profilesContextState.estimateTokens(messages) };
+    const events = await rpc.host.ai.chat({
+        endpoint: sceneFoundationState.cfg.endpoint,
+        apiKey: sceneFoundationState.cfg.key,
         model: sceneFoundationState.cfg.model,
+        host_tools: !!profilesContextState.ext.code,
+        context_window: Number(profilesContextState.contextConfig.maxTokens) || 128000,
         ...(sceneFoundationState.cfg.reasoningEffort ? {
           reasoning_effort: sceneFoundationState.cfg.reasoningEffort
         } : {}),
-        stream: true,
-        messages: [{
-          role: 'system',
-          content: sceneFoundationState.cfg.sys
-        }, ...(window.prepareJarvisMessages ? await window.prepareJarvisMessages(voicePipelineState.hist) : voicePipelineState.hist.slice(-12))]
-      })
-    });
-    check();
-    if (!r.ok) throw new Error('LLM ' + r.status);
-    const rd: any = r.body.getReader(),
-      dc: any = new TextDecoder();
-    for (;;) {
-      const {
-        value,
-        done
-      }: any = await rd.read();
+        messages,
+    }, { signal });
+    let completed = false;
+    for await (const event of events) {
       check();
-      buf += dc.decode(value, {
-        stream: !done
-      });
-      const ls: any = buf.split('\n');
-      buf = ls.pop();
-      if (done && buf) {
-        ls.push(buf);
-        buf = '';
+      if (event.type === 'text') {
+        full += event.text;
+        enqueue(event.text);
+      } else if (event.type === 'pi') {
+        const info = event.event;
+        if (info.type === 'soul_updated') updateSoul(null, info.text);
+        if (info.type === 'tool_execution_start') logM('⚙ Pi: ' + info.toolName);
+        if (info.type === 'tool_execution_end') logM('Pi: ' + info.toolName + (info.isError ? ' failed' : ' completed'), !!info.isError);
+        if (info.type === 'extension_error') logM(info.message, true);
+      } else if (event.type === 'complete') {
+        full = event.text;
+        completed = true;
       }
-      const consume: any = (l?: any): any => {
-        if (!l.startsWith('data:') || l.slice(5).trim() === '[DONE]') return;
-        let t: any = '';
-        try {
-          t = JSON.parse(l.slice(5)).choices[0].delta.content || '';
-        } catch (e: any) {}
-        full += t;
-        enqueue(t);
-      };
-      for (const l of ls) consume(l);
-      if (done) break;
     }
+    if (!completed) throw new Error('Pi stream ended before completion');
     check();
     enqueue('', true);
     fin = true;
@@ -274,7 +304,7 @@ export async function ask(text?: any, id: any = voicePipelineState.turnId): Prom
       content: full
     });
     committed = true;
-    logAdd('ai', full);
+    logMainMessage('ai', full);
     if (sp) await sp;
     check();
     await drain(signal);
@@ -291,7 +321,7 @@ export async function ask(text?: any, id: any = voicePipelineState.turnId): Prom
   }
 }
 export async function turn(a?: any): Promise<any> {
-  if (a.length < sceneFoundationState.actx.sampleRate * .5) return;
+  if (a.length < sceneFoundationState.actx.sampleRate * .2) return;
   const id: any = ++voicePipelineState.turnId;
   voicePipelineState.busy = true;
   voicePipelineState.aborted = false;
@@ -319,7 +349,7 @@ export async function userText(t?: any, force?: any): Promise<any> {
   const target: any = sceneFoundationState.talkTo;
   cancelTurn();
   if (target && !force) {
-    const routed: any = window.agentTalk?.(t, target);
+    const routed: any = agentTalk(t, target);
     voicePipelineState.busy = false;
     if (sceneFoundationState.mode !== 'idle') {
       sceneFoundationState.mode = 'listening';
@@ -421,6 +451,7 @@ export function startRec(): any {
     }
     t = t.trim();
     if (!t) return;
+    voicePipelineState.lastLiveText = t;
     sceneFoundationState.lab.text = '> ' + t.slice(-58);
     debounceSTT(final.trim());
   };
@@ -497,11 +528,11 @@ export function setEngine(): any {
     sttMode: sceneFoundationState.cfg.sttMode === 'browser' ? 'whistle' : 'browser'
   });
 }
-export async function loadP(options: any = sceneFoundationState.cfg): Promise<any> {
+export async function loadP(options: any = sceneFoundationState.cfg, silent = false): Promise<any> {
   const key: any = JSON.stringify([options.tts, options.dev]);
   if (voicePipelineState.phLoading) {
-    await voicePipelineState.phLoading;
-    return loadP(options);
+    try { await voicePipelineState.phLoading; } catch { /* This caller may retry a failed preload. */ }
+    return loadP(options, silent);
   }
   if (voicePipelineState.ph && voicePipelineState.phKey === key) return voicePipelineState.ph;
   if (voicePipelineState.ph) {
@@ -509,15 +540,34 @@ export async function loadP(options: any = sceneFoundationState.cfg): Promise<an
     voicePipelineState.ph = null;
   }
   voicePipelineState.phKey = key;
-  voicePipelineState.phLoading = initP(options);
+  voicePipelineState.phLoading = initP(options, silent);
   try {
     return await voicePipelineState.phLoading;
   } finally {
     voicePipelineState.phLoading = null;
   }
 }
-export async function initP(options?: any): Promise<any> {
-  sceneFoundationState.lab.text = 'LOADING LOCAL TTS...';
+let ttsPreloadTimer: ReturnType<typeof setTimeout> | undefined;
+let ttsPreloadRevision = 0;
+export function preloadTTS(): void {
+  const revision = ++ttsPreloadRevision;
+  clearTimeout(ttsPreloadTimer);
+  ttsPreloadTimer = setTimeout(() => {
+    void (async () => {
+      // Avoid replacing/disposal of a model while it is speaking or previewing.
+      if (voicePipelineState.busy || voicePipelineState.speechOwner || sceneFoundationState.mode === 'speaking' || useRuntimeSettings.getState().voiceBusy) {
+        if (revision === ttsPreloadRevision) preloadTTS();
+        return;
+      }
+      const options = { ...sceneFoundationState.cfg };
+      const tts = await loadP(options, true);
+      if (revision !== ttsPreloadRevision) return;
+      await resolveVoice(tts, options.voice);
+    })().catch(error => console.debug('Background TTS preload unavailable:', error));
+  }, 400);
+}
+export async function initP(options?: any, silent = false): Promise<any> {
+  if (!silent) sceneFoundationState.lab.text = 'LOADING LOCAL TTS...';
   const M: any = await voicePipelineState.imp('./vendor/phonon-tts/index.js');
   const root: any = new URL('./models/phonon-31m-en-local-snapshot-92741c5b07d085ff840e26fea8ce43110b87852f/', location.href),
     file: any = (name?: any): any => new URL(name, root).href;
@@ -535,7 +585,7 @@ export async function initP(options?: any): Promise<any> {
       defaultVoice: 'default'
     },
     onProgress: (p?: any): any => {
-      sceneFoundationState.lab.text = 'TTS ' + Math.round(100 * p.loaded / (p.total || 1)) + '%';
+      if (!silent) sceneFoundationState.lab.text = 'TTS ' + Math.round(100 * p.loaded / (p.total || 1)) + '%';
     }
   };
   if ((options.tts || '').startsWith('hf://')) o.model = options.tts;
@@ -640,6 +690,7 @@ export function connectVoicePipeline(): void {
   voicePipelineState.STT_DEBOUNCE_MS = 1100;
   voicePipelineState.sttTimer = null;
   voicePipelineState.sttPending = '';
+  voicePipelineState.lastLiveText = '';
   voicePipelineState.junk = (t?: any): any => t.length < 2 || /^[\s.,!?-]*(you|uh+|um+|hm+|mm+|ah+|oh+|thanks for watching|bye)?[\s.,!?-]*$/i.test(t) || /^[\[(*].*[\])*]$/.test(t);
   voicePipelineState.wseq = 0;
   voicePipelineState.sq = Promise.resolve();
@@ -659,16 +710,18 @@ export function connectVoicePipeline(): void {
       return;
     }
     if (e.composedPath().some((n?: any): any => n instanceof Element && (n.matches('form,input,textarea,select,button,a[href],[role="textbox"]') || (n instanceof HTMLElement && n.isContentEditable)))) return;
-    if (e.key === 'Enter' && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && sceneFoundationState.mode !== 'idle') {
-      e.preventDefault();
-      stopVoiceDemo();
-      cancelTurn();
-      return;
+    if (e.key === 'Enter' && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      if (sceneFoundationState.mode === 'listening') {
+        e.preventDefault();
+        commitListening();
+        return;
+      }
     }
   });
   useSettingsStore.subscribe((state?: any, previous?: any): any => {
     sceneFoundationState.cfg = state.config;
     if (state.config.sttMode !== previous.config.sttMode) applyEngine();
+    if (state.config.tts !== previous.config.tts || state.config.dev !== previous.config.dev || state.config.voice !== previous.config.voice) preloadTTS();
   });
   // TTS = phonon-tts: PhononTTS.load({lang,device}) + tts.stream(text,{voice,signal}) -> Float32Array chunks @ tts.sampleRate
   voicePipelineState.speechOwner = null;
@@ -677,7 +730,8 @@ export function connectVoicePipeline(): void {
   voicePipelineState.srcs = [];
   voicePipelineState.phLoading = null;
   voicePipelineState.phKey = '';
-  voicePipelineState.profileMuted = (agent?: any): any => window.jarvisVoiceProfile?.muted(agent) ?? false;
-  voicePipelineState.profileVoice = (agent?: any): any => window.jarvisVoiceProfile?.voice(agent) ?? sceneFoundationState.cfg.voice;
+  voicePipelineState.profileMuted = profileMuted;
+  voicePipelineState.profileVoice = profileVoice;
   voicePipelineState.speechTargetActive = (agent?: any): any => agent ? sceneFoundationState.talkTo === agent.id || agent.reportSpeechEpoch === voicePipelineState.speechEpoch : !sceneFoundationState.talkTo;
+  preloadTTS();
 }

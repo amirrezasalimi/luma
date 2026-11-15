@@ -1,1 +1,5 @@
 - do not use browser test or smoke test until user asked for it.
+- Do not write tests unless the user explicitly asks for them.
+- Prefer module exports/imports over window globals for internal communication. Use window only for necessary browser APIs or intentional public integrations.
+- https://orpc.dev/llms.txt
+- https://docs.pi.dev/latest/sdk
