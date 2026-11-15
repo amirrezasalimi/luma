@@ -10,7 +10,7 @@ import { aiEvent, chatRequest, streamAI } from './services/ai';
 const procedure = os.$context<{ request: Request }>();
 const object = z.record(z.string(), z.unknown());
 function code() {
-  return createCodeAgentService({ enabled: codeAgentEnabled(), workspace: process.env.JARVIS_CODE_ROOT || process.cwd() });
+  return createCodeAgentService({ enabled: codeAgentEnabled(), workspace: process.env.JARVIS_CODE_ROOT || process.cwd(), fullAccess: true });
 }
 
 

@@ -19,7 +19,7 @@ export type CodeResult =
   | { ok: boolean; path: string; bytes?: number }
   | { stdout: string; stderr: string; exitCode: number | null; signal: string | null; timedOut: boolean; aborted: boolean; truncated: boolean; error?: { code: string; message: string } };
 
-type Options = { enabled: boolean; workspace: string };
+type Options = { enabled: boolean; workspace: string; fullAccess?: boolean };
 class CodeError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
 }
@@ -174,7 +174,7 @@ function bash(command: string, cwd: string, timeoutMs: number, abortSignal: Abor
   });
 }
 
-export function createCodeAgentService({ enabled, workspace }: Options) {
+export function createCodeAgentService({ enabled, workspace, fullAccess = false }: Options) {
   workspace = resolve(workspace);
   return async (input: Record<string, unknown>, signal: AbortSignal): Promise<ServiceResult<CodeResult>> => {
     try {
@@ -185,6 +185,11 @@ export function createCodeAgentService({ enabled, workspace }: Options) {
         return fail(400, 'INVALID_OPERATION', 'Unknown coding operation');
       }
       const root = await realpath(workspace);
+      const resolvePath = (value: unknown, allowMissing = false) => {
+        if (!fullAccess) return confined(root, value, allowMissing);
+        if (typeof value !== 'string' || value.includes('\0')) return fail(400, 'INVALID_PATH', 'path/cwd must be a string without NUL bytes');
+        return confined(sep, resolve(root, value), allowMissing);
+      };
       if (op === 'bash') {
         const command = text(input, 'command');
         if (!command.trim() || command.includes('\0')) return fail(400, 'INVALID_COMMAND', 'command must be nonempty and contain no NUL bytes');
@@ -192,11 +197,11 @@ export function createCodeAgentService({ enabled, workspace }: Options) {
         if (typeof timeout !== 'number' || !Number.isInteger(timeout) || timeout < 1 || timeout > CODE_LIMITS.maxTimeoutMs) {
           return fail(400, 'INVALID_TIMEOUT', 'timeoutMs must be an integer from 1 to 120000');
         }
-        const cwd = await confined(root, input.cwd ?? '.');
+        const cwd = await resolvePath(input.cwd ?? '.');
         if (!(await stat(cwd)).isDirectory()) return fail(400, 'NOT_DIRECTORY', 'cwd must be a directory');
         return await bash(command, cwd, timeout, signal);
       }
-      const path = await confined(root, input.path ?? (op === 'list' ? '.' : undefined), op === 'write');
+      const path = await resolvePath(input.path ?? (op === 'list' ? '.' : undefined), op === 'write');
       if (op === 'list') {
 
         const entries: { name: string; type: string }[] = [];
@@ -210,7 +215,7 @@ export function createCodeAgentService({ enabled, workspace }: Options) {
       }
       if (op === 'read') return result({ path: relative(root, path), content: await readLimited(path) });
       if (op === 'delete') {
-        if (path === root || await realpath(path) === root) return fail(403, 'ROOT_DELETE', 'Cannot delete the workspace root');
+        if (path === root || await realpath(path) === root || path === sep || await realpath(path) === sep) return fail(403, 'ROOT_DELETE', 'Cannot delete the filesystem or workspace root');
         if (input.recursive !== undefined && typeof input.recursive !== 'boolean') return fail(400, 'INVALID_INPUT', 'recursive must be a boolean');
         if ((await lstat(path)).isDirectory() && input.recursive !== true) return fail(400, 'RECURSIVE_REQUIRED', 'Directory deletion requires recursive: true');
         await rm(path, { recursive: input.recursive === true });
@@ -229,8 +234,8 @@ export function createCodeAgentService({ enabled, workspace }: Options) {
       } else { content = text(input, 'content'); }
       checkContent(content);
       // Recheck the parent and target immediately before writing. Do not create parents.
-      await confined(root, relative(root, dirname(path)));
-      await confined(root, relative(root, path), true);
+      await resolvePath(dirname(path));
+      await resolvePath(path, true);
       try {
         if (!(await stat(path)).isFile()) return fail(400, 'NOT_FILE', 'Expected a regular file');
       } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }

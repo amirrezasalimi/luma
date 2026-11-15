@@ -19,7 +19,9 @@ Each request restores the supplied app history through an in-memory
 conversation persistence, context selection/compaction, and scene scripts.
 Pi's unrestricted default tools are disabled. With Code Agent enabled in Jarvis
 settings, Pi runs native `jarvis_host`
-tool calls through the existing workspace-confined, size-limited host service.
+tool calls through the host service with full filesystem access under the OS
+user's permissions. Absolute paths can address files outside the workspace;
+relative paths default to the workspace. File/output size and timeout limits remain.
 Pi owns the tool-call/result loop within a request; scene actions and sub-agent
 scheduling still belong to the browser. Shell access is trusted host execution,
 not an OS sandbox. Summary requests never receive tools or third-party resources.

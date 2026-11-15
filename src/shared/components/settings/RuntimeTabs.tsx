@@ -82,9 +82,9 @@ export function CodeSettings({ services, active }: { services: SettingsServices;
     <h3>CODE AGENT · HOST ACCESS</h3>
     <Toggle label="Enable host coding tools for main and sub-agents" checked={!!services.snapshot().agents.code} onChange={async code => {
       if (code && !await confirm('Enable host filesystem and Bash tools? Bash is NOT sandboxed and runs with your full user permissions.')) return;
-      services.setAgentDefaults({ code }); void check();
+      await services.setAgentDefaults({ code }); void check();
     }} />
-    <p className="mut">Tools can read, write and delete workspace files and execute Bash. Bash is NOT sandboxed. File contents and output are sent to your LLM provider. Disabling cancels active requests best-effort, but does not undo completed changes. This toggle saves immediately; the server flag must also be enabled.</p>
+    <p className="mut">Full host file list, read, write, edit, delete and Bash execution access with your OS user permissions, including paths outside the workspace. Relative paths start in the workspace. Not sandboxed. File contents and command output are sent to your LLM provider. Disabling cancels active requests best-effort but does not undo completed changes. No server flag is required.</p>
     <p role="status">{status}</p><Action disabled={checking} onClick={() => void check()}>CHECK SERVER</Action>
   </>;
 }

@@ -3,13 +3,13 @@ import { Type } from 'typebox';
 import { createCodeAgentService } from './code-agent';
 import { codeAgentEnabled } from './code-settings';
 
-/** Reuse Jarvis's confined, bounded host operations; never expose Pi's unrestricted defaults. */
+/** Host access uses the saved Code Agent switch and the host user's OS permissions. */
 export function createPiHostTools(enabled: boolean, workspace: string): ToolDefinition[] {
   if (!enabled) return [];
-  const execute = createCodeAgentService({ enabled, workspace });
+  const execute = createCodeAgentService({ enabled, workspace, fullAccess: true });
   return [{
     name: 'jarvis_host', label: 'Jarvis host',
-    description: 'Work with files in the Jarvis workspace or run a trusted shell command. Shell access is not an OS sandbox. Prefer these native operations over generating browser JavaScript for host work.',
+    description: 'Full host file list/read/write/edit/delete and Bash execution, subject to OS user permissions. Absolute paths may address files outside the workspace; relative paths and default command cwd use the workspace. Not sandboxed. Preserve unrelated work and obtain user approval for destructive actions. Prefer these native operations over browser JavaScript for host work.',
     parameters: Type.Object({
       op: Type.Union(['list', 'read', 'write', 'edit', 'delete', 'bash'].map(value => Type.Literal(value))),
       path: Type.Optional(Type.String()), content: Type.Optional(Type.String()),
