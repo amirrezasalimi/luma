@@ -3,7 +3,7 @@ import { useRuntimeSettings } from "../settings";
 import { clearSessionStage, refreshSessionList, restoreLabels, saveSession, sessionPlain, sessionRequest, sessionStatus, commitSession, sessionsState, stopSessionWork } from './sessions';
 import { sceneFoundationState } from './scene-foundation';
 import { objectRendererState } from './object-renderer';
-import { holoApply, hologramControlsState, lblAct, logM } from './hologram-controls';
+import { holoApply, hologramControlsState, lblAct, logM, trimMainLogs } from './hologram-controls';
 import { profilesContextState } from './profiles-context';
 import { logAdd, sceneHudState } from './scene-hud';
 import { addObj } from './scene-objects';
@@ -61,6 +61,8 @@ export function restoreSession(s?: any): any {
     for (const row of s.agents || []) {
       const a: any = {
         ...row,
+        log: (row.log || []).slice(-80),
+        logArchive: (row.logArchive || []).slice(-200),
         tm: 0,
         E: 0,
         spawnA: 0,
@@ -144,13 +146,10 @@ export function restoreSession(s?: any): any {
     for (const [k, v] of s.labelText || []) sceneFoundationState.HLT.set(k, v);
     for (const message of s.history || []) voicePipelineState.hist.push(message);
     profilesContextState.mainContextState = s.mainContextState || {};
-    for (const entry of s.main?.log || []) hologramControlsState.MAIN.log.push(entry);
-    for (const entry of s.main?.archiveJSON ? JSON.parse(s.main.archiveJSON) : s.main?.archive || []) hologramControlsState.MAIN.archive.push(entry);
-    if (s.main?.archiveJSON) {
-      hologramControlsState.mainArchiveCache.source = hologramControlsState.MAIN.archive;
-      hologramControlsState.mainArchiveCache.length = hologramControlsState.MAIN.archive.length;
-      hologramControlsState.mainArchiveCache.json = s.main.archiveJSON;
-    }
+    for (const entry of (s.main?.log || []).slice(-120)) hologramControlsState.MAIN.log.push(entry);
+    for (const entry of (s.main?.archiveJSON ? JSON.parse(s.main.archiveJSON) : s.main?.archive || []).slice(-200)) hologramControlsState.MAIN.archive.push(entry);
+    hologramControlsState.mainArchiveCache.source = null;
+    trimMainLogs();
     hologramControlsState.MAIN.open = s.main?.open ?? true;
     for (const row of s.transcript || []) (mainOrchestratorState._la || logAdd)(row.role || 'ai', String(row.text || ''));
     [workspaceUiState.agp, workspaceUiState.tlp].forEach((n?: any, i?: any): any => n.classList.toggle('c', s.ui?.panels?.[i]?.collapsed ?? n === workspaceUiState.tlp));
@@ -224,7 +223,7 @@ export async function loadSession(id?: any): Promise<any> {
     await saveSession(true);
     sessionsState.activeSession = row;
     restoreSession(row.snapshot);
-    loadUndo();
+    void loadUndo();
     sessionsState.lastSnapshot = '';
     await saveSession(true);
     await refreshSessionList();
@@ -262,7 +261,7 @@ export async function createNewSession(name?: any): Promise<any> {
   await commitSession({ ...next, snapshot: blank });
   sessionsState.activeSession = next;
   restoreSession(blank);
-  loadUndo();
+  void loadUndo();
   for (const p of Object.values<any>(profilesContextState.souls.agents)) if (p.autoload && p.soul.trim()) spawn(p.name, '', null, true, null, {
     idle: true,
     unlimited: p.unlimited
@@ -298,16 +297,16 @@ export async function initSessions(): Promise<any> {
     }
     sessionsState.sessionReady = true;
     phase = 'restoring undo history';
-    loadUndo();
+    void loadUndo();
     phase = 'saving the restored session';
     await saveSession(true);
     phase = 'loading the session list';
     await refreshSessionList();
-    setInterval((): any => saveSession().catch((): any => {}), 500);
+    setInterval((): any => saveSession().catch((): any => {}), 5000);
   } catch (e: any) {
     console.error('Session initialization failed during ' + phase, e);
     sessionStatus('Session initialization failed while ' + phase + ': ' + e.message + ' — existing saved data has not been deleted. ' + (sessionsState.sessionReady ? 'Saving will be retried.' : 'This page is not being saved.'));
-    if (sessionsState.sessionReady) setInterval((): any => saveSession().catch((): any => {}), 1500);
+    if (sessionsState.sessionReady) setInterval((): any => saveSession().catch((): any => {}), 5000);
   }
 }
 // ---------------- On-demand runtime diagnostics ----------------

@@ -1,4 +1,5 @@
 import { readPreference, writePreference } from '../persistence';
+import { rpc } from '../rpc';
 /** workspace-history: runtime implementation. */
 import { saveSession, sessionStatus, sessionsState, snapshotSession, stopSessionWork } from './sessions';
 import { hologramControlsState } from './hologram-controls';
@@ -14,6 +15,21 @@ interface ModuleState {
 }
 
 export const workspaceHistoryState = {} as ModuleState;
+const MAX_UNDO_BYTES = 2 * 1024 * 1024;
+
+function boundedUndoHistory(): string {
+  const undo = workspaceHistoryState.undoActions.slice(-10);
+  const redo = workspaceHistoryState.redoActions.slice(-10);
+  let encoded = JSON.stringify({ undo, redo });
+  // Full snapshots grow with conversation length. Bound total storage, not just count.
+  while (new TextEncoder().encode(encoded).byteLength > MAX_UNDO_BYTES && (undo.length || redo.length)) {
+    if (undo.length > 1) undo.shift();
+    else if (redo.length) redo.shift();
+    else undo.shift();
+    encoded = JSON.stringify({ undo, redo });
+  }
+  return encoded;
+}
 
 export function workspaceFingerprint(s?: any): any {
   return JSON.stringify({
@@ -49,19 +65,20 @@ export function workspaceFingerprint(s?: any): any {
 export function persistUndo(): any {
   if (!sessionsState.activeSession) return;
   try {
-    writePreference(workspaceHistoryState.undoStorageKey(), JSON.stringify({
-      undo: workspaceHistoryState.undoActions.slice(-10),
-      redo: workspaceHistoryState.redoActions.slice(-10)
-    }));
+    writePreference(workspaceHistoryState.undoStorageKey(), boundedUndoHistory());
   } catch (e: any) {
     sessionStatus('Undo server save failed: ' + e.message + '; session saving remains separate');
   }
 }
-export function loadUndo(): any {
+export async function loadUndo(): Promise<void> {
+  const storageKey = workspaceHistoryState.undoStorageKey();
+  hologramControlsState.undoReady = false;
   workspaceHistoryState.undoActions = [];
   workspaceHistoryState.redoActions = [];
   try {
-    const value: any = JSON.parse(readPreference(workspaceHistoryState.undoStorageKey()) || '{}');
+    const saved = await rpc.persistence.preference({ key: storageKey });
+    if (storageKey !== workspaceHistoryState.undoStorageKey()) return;
+    const value: any = JSON.parse(saved.value || '{}');
     workspaceHistoryState.undoActions = Array.isArray(value.undo) ? value.undo.slice(-10) : [];
     workspaceHistoryState.redoActions = Array.isArray(value.redo) ? value.redo.slice(-10) : [];
   } catch (e: any) {
@@ -70,7 +87,7 @@ export function loadUndo(): any {
   hologramControlsState.undoReady = true;
 }
 export function captureUndoAction(label?: any): any {
-  if (!sessionsState.sessionReady || sessionsState.sessionRestoring || workspaceHistoryState.undoApplying) return null;
+  if (!sessionsState.sessionReady || sessionsState.sessionRestoring || !hologramControlsState.undoReady || workspaceHistoryState.undoApplying) return null;
   return {
     label,
     session: sessionsState.activeSession.id,
@@ -193,7 +210,7 @@ export function prepareWorkspaceHistory(): void {
       if (node instanceof HTMLInputElement && node.matches('input[data-t]') && !node.value) return false;
       return node.matches('input,textarea,select,[role="textbox"]') || (node instanceof HTMLElement && node.isContentEditable);
     })) return;
-    if (document.querySelector('dialog[open]') || !sessionsState.sessionReady || sessionsState.sessionRestoring) return;
+    if (document.querySelector('dialog[open]') || !sessionsState.sessionReady || sessionsState.sessionRestoring || !hologramControlsState.undoReady) return;
     event.preventDefault();
     if (workspaceHistoryState.undoApplying) return;
     void applyWorkspaceHistory(event.shiftKey || key === 'y').catch(error => sessionStatus('Undo/redo failed: ' + error.message));

@@ -222,6 +222,9 @@ export async function setStageBackground(src?: any, options: any = {}): Promise<
     workspace: any = hologramControlsState.workspaceEpoch,
     image: any = new Image();
   image.crossOrigin = 'anonymous';
+  // Persist the requested background independently of its downloaded/rendered image.
+  // Restoration is asynchronous; autosave must not replace it with an empty config.
+  sceneFoundationState.stageBackground.config = config;
   await new Promise((resolve?: any, reject?: any): any => {
     const timer: any = setTimeout((): any => {
       image.src = '';

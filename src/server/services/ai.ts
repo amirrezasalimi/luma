@@ -1,4 +1,4 @@
-import { createAgentSession, createCodemodeExtension, createMcpExtension, createToolSearchExtension, DefaultResourceLoader, getAgentDir, ModelRuntime, SessionManager, SettingsManager, type ExtensionFactory } from '@earendil-works/pi-coding-agent';
+import type { ExtensionFactory } from '@earendil-works/pi-coding-agent';
 import { z } from 'zod';
 import { createPiHostTools } from './pi-tools';
 import { VOICE_RESPONSE_PROMPT } from '../../shared/prompts/voice';
@@ -35,6 +35,7 @@ export const aiEvent = z.discriminatedUnion('type', [
 /** Pi owns the native tool loop; Jarvis owns conversation snapshots and scene execution. */
 export async function runAI(input: z.output<typeof chatRequest>, apiKey: string, signal: AbortSignal,
   onText: (text: string) => void, onEvent: (event: PiEvent) => void = () => {}) {
+  const { createAgentSession, createCodemodeExtension, createMcpExtension, createToolSearchExtension, DefaultResourceLoader, getAgentDir, ModelRuntime, SessionManager, SettingsManager } = await import('@earendil-works/pi-coding-agent');
   const history = input.messages.filter(message => message.role !== 'system');
   const last = history.at(-1);
   if (!last || last.role !== 'user') throw new Error('AI history must end with a user message');
@@ -75,21 +76,6 @@ export async function runAI(input: z.output<typeof chatRequest>, apiKey: string,
     // Its supported full-prompt override projects instructions into a leading
     // provider system message, retaining Pi's current MCP/skill prompt sections.
     const appPromptExtension: ExtensionFactory = pi => {
-      const requestId = crypto.randomUUID();
-      let providerRequest = 0;
-      pi.on('before_provider_request', event => {
-        // Inspect the serialized provider payload, after Pi's context projection,
-        // not merely the browser-supplied conversation. Never include auth headers.
-        console.info('[AI context]', JSON.stringify({
-          requestId,
-          providerRequest: ++providerRequest,
-          at: new Date().toISOString(),
-          model: input.model,
-          profile: input.profile ?? 'main',
-          purpose: input.purpose,
-          payload: event.payload,
-        }, null, 2));
-      });
       pi.on('before_agent_start', event => ({
         systemPrompt: event.systemPrompt + (event.systemPrompt.includes(appSystemPrompt) ? '' : '\n\nAPPLICATION INSTRUCTIONS (including saved soul):\n' + appSystemPrompt)
           + (resources ? '\n\n' + VOICE_RESPONSE_PROMPT : ''),

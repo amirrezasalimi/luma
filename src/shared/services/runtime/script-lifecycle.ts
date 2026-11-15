@@ -82,7 +82,7 @@ export function callS(o?: any, s?: any, hk?: any, ...a: any): any {
   const f: any = s.h[hk];
   if (!f || s.dead[hk]) return;
   try {
-    const r: any = f.apply(null, a);
+    const r: any = hk === 'update' ? withFrameUpdate(() => f.apply(null, a)) : f.apply(null, a);
     if (r && r.catch) r.catch((e?: any): any => fail(o, s, hk, e));
     return r;
   } catch (e: any) {
@@ -457,3 +457,4 @@ export function prepareScriptLifecycle(): void {
     }
   };
 }
+import { withFrameUpdate } from './log-context';

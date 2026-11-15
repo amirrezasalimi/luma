@@ -183,7 +183,7 @@ export function mkApi(x?: any): any {
       },
       i: any = setInterval((): any => {
         try {
-          fn();
+          withFrameUpdate(() => fn());
         } catch (e: any) {
           x.s ? fail(x.o, x.s, 'every', e) : console.error(e);
         }
@@ -247,7 +247,7 @@ export function mkApi(x?: any): any {
           delta: any = Math.min(.1, (now - last) / 1000);
         last = now;
         try {
-          fn(delta);
+          withFrameUpdate(() => fn(delta));
         } catch (e: any) {
           task.c();
           if (x.s) fail(x.o, x.s, 'frame', e);else console.error('Frame callback failed:', e);
@@ -613,3 +613,4 @@ export function stopManagerCallbacks(): void {
   tasks.clear();
   renderScriptManager();
 }
+import { withFrameUpdate } from './log-context';

@@ -45,8 +45,20 @@ interface ModuleState {
 }
 
 export const hologramControlsState = {} as ModuleState;
+const MAX_MAIN_LOGS = 120;
+const MAX_ARCHIVED_LOGS = 200;
+
+export function trimMainLogs(): void {
+  const main = hologramControlsState.MAIN;
+  if (main.log.length > MAX_MAIN_LOGS) main.archive.push(...main.log.splice(0, main.log.length - MAX_MAIN_LOGS));
+  if (main.archive.length > MAX_ARCHIVED_LOGS) {
+    main.archive.splice(0, main.archive.length - MAX_ARCHIVED_LOGS);
+    hologramControlsState.mainArchiveCache.source = null;
+  }
+}
 
 export function savedMainArchive(): any {
+  trimMainLogs();
   const c: any = hologramControlsState.mainArchiveCache,
     a: any = hologramControlsState.MAIN.archive;
   if (c.source !== a || a.length < c.length) {
@@ -67,7 +79,7 @@ export function logM(t?: any, err?: any): any {
     text: String(t).slice(0, 300),
     err: !!err
   });
-  if (hologramControlsState.MAIN.log.length > 120) hologramControlsState.MAIN.archive.push(hologramControlsState.MAIN.log.shift());
+  trimMainLogs();
   rq();
 }
 export
@@ -426,6 +438,7 @@ export function prepareHologramControls(): void {
     json: '[]'
   };
   hologramControlsState.actLog = (by?: any, t?: any): any => {
+    if (inFrameUpdate()) return;
     const a: any = mainOrchestratorState.findA(by);
     if (a) logA(a, '• ' + t);else if (by === 'jarvis') logM('• ' + t);
   };
@@ -621,3 +634,4 @@ export function prepareHologramControls(): void {
 
   // ---------------- 12c. Scene objects & node hierarchy ----------------
 }
+import { inFrameUpdate } from './log-context';

@@ -1,4 +1,3 @@
-import { getAgentDir } from '@earendil-works/pi-coding-agent';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -18,10 +17,10 @@ export const piMcpMutation = z.discriminatedUnion('action', [
   z.object({ action: z.literal('delete'), name: z.string().min(1) }),
 ]);
 
-export function createPiMcpConfigStore(agentDir: () => string = getAgentDir) {
+export function createPiMcpConfigStore(agentDir: () => string | Promise<string> = async () => (await import('@earendil-works/pi-coding-agent')).getAgentDir()) {
   let pending = Promise.resolve();
   async function read() {
-    const path = join(agentDir(), 'mcp.json');
+    const path = join(await agentDir(), 'mcp.json');
     let document: Record<string, any>;
     try { document = JSON.parse(await readFile(path, 'utf8')); }
     catch (error) {
@@ -47,7 +46,7 @@ export function createPiMcpConfigStore(agentDir: () => string = getAgentDir) {
           if (!Object.hasOwn(servers, input.name)) throw new Error('Unknown Pi MCP server');
           servers[input.name] = { ...servers[input.name], enabled: input.enabled };
         }
-        await mkdir(agentDir(), { recursive: true });
+        await mkdir(await agentDir(), { recursive: true });
         const temporary = `${path}.jarvis-${crypto.randomUUID()}.tmp`;
         await writeFile(temporary, JSON.stringify({ ...document, mcpServers: servers }, null, 2) + '\n', { mode: 0o600 });
         await rename(temporary, path);

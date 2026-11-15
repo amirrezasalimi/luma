@@ -51,6 +51,20 @@ export function bindCameraInput(): void {
     } else if (!sceneFoundationState.dragLock) sceneFoundationState.cam.yaw -= dx * .008;
   });
   cameraInputState.up = (e?: any): any => {
+    // HUD controls take precedence over hologram selection, even while thinking.
+    if (e.type === 'pointerup' && cameraInputState.ptr.has(e.pointerId) && cameraInputState.ptr.size === 1 && cameraInputState.moved < 6) {
+      const rect = cameraInputState.V.getBoundingClientRect();
+      const scale = cameraInputState.V.width / rect.width;
+      const x = (e.clientX - rect.left) * scale;
+      const y = (e.clientY - rect.top) * scale;
+      const button = voicePipelineState.btns.find((b: any) => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1);
+      if (button) {
+        button.fn();
+        cameraInputState.ptr.delete(e.pointerId);
+        cameraInputState.V.style.cursor = 'grab';
+        return;
+      }
+    }
     if (e.type === 'pointerup' && cameraInputState.ptr.has(e.pointerId) && cameraInputState.ptr.size === 1 && cameraInputState.moved < 6 && selectAgentAtPointer(e)) {
       cameraInputState.ptr.delete(e.pointerId);
       cameraInputState.V.style.cursor = 'grab';

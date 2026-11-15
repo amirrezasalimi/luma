@@ -370,6 +370,7 @@ export async function userText(t?: any, force?: any): Promise<any> {
   } catch (e: any) {
     if (id !== voicePipelineState.turnId || e.name === 'AbortError') return;
     console.error(e);
+    logM('AI request failed: ' + String(e.message || e), true);
     sceneFoundationState.lab.text = 'ERROR: ' + String(e.message || e).slice(0, 50);
     await voicePipelineState.sleep(2500);
   }
@@ -704,7 +705,11 @@ export function connectVoicePipeline(): void {
       return;
     }
     if (e.defaultPrevented || e.isComposing) return;
-    if ((e.key.toLowerCase() === 'm' || e.code === 'KeyM') && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey && !e.composedPath().some((n?: any): any => n instanceof Element && (n.matches('textarea,select,[role="textbox"],input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"])') || (n instanceof HTMLElement && n.isContentEditable)))) {
+    if ((e.key.toLowerCase() === 'm' || e.code === 'KeyM') && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey && !e.composedPath().some((n?: any): any => {
+      if (!(n instanceof Element)) return false;
+      if (n instanceof HTMLInputElement && n.matches('input[data-t]') && !n.value && (sceneFoundationState.mode === 'thinking' || sceneFoundationState.mode === 'speaking')) return false;
+      return n.matches('textarea,select,[role="textbox"],input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"])') || (n instanceof HTMLElement && n.isContentEditable);
+    })) {
       e.preventDefault();
       setMute(!voicePipelineState.muted);
       return;

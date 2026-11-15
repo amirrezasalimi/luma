@@ -147,6 +147,7 @@ export function connectSettings(): void {
       },
       setBackground: async (url?: any): Promise<any> => {
         await setStageBackground(url || null);
+        await saveSession(true);
         settingsChanged();
       },
       arrangePanels: layoutPanels,

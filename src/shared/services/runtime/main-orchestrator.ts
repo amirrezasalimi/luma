@@ -1,3 +1,4 @@
+import { sceneExecutionFeedback } from './scene-execution-feedback';
 import { MAIN_SYSTEM_PROMPT } from '../../prompts/main';
 import { SCENE_API_PROMPT } from '../../prompts/scene-api';
 /** main-orchestrator: runtime implementation. */
@@ -73,8 +74,11 @@ export function logMainMessage(r?: any, t?: any): any {
     for (const m of String(t).matchAll(/```([^\n`]*)\n([\s\S]*?)```/g)) {
       if (!/^(?:js|javascript)?[ \t]*$/.test(m[1])) continue;
       const epoch = hologramControlsState.workspaceEpoch;
+      const turnId = voicePipelineState.turnId;
       execCode('jarvis', null, m[2]).then((x: any) => {
-        if (epoch === hologramControlsState.workspaceEpoch && x.er) notifyJarvis({ name: 'jarvis-js', id: 'js', task: 'code' }, 'FAILED', scriptLifecycleState.errTxt(x.er));
+        if (epoch !== hologramControlsState.workspaceEpoch || turnId !== voicePipelineState.turnId) return;
+        const feedback = sceneExecutionFeedback(x, scriptLifecycleState.errTxt);
+        if (feedback) notifyJarvis({ name: 'jarvis-js', id: 'js', task: 'scene inspection', epoch, turnId }, feedback.event, feedback.detail);
       }).catch((error: Error) => logM(error.message, true));
     }
   }

@@ -123,9 +123,7 @@ export function snapshotSession(raw: any = false): any {
       hlid: hologramControlsState.hlid
     },
     preferences: {
-      muted: voicePipelineState.muted,
-      nf: voicePipelineState.nf,
-      vc: voicePipelineState.vc
+      muted: voicePipelineState.muted
     },
     camera: sceneFoundationState.cam,
     cameraVersion: 2,
@@ -161,8 +159,7 @@ export function snapshotSession(raw: any = false): any {
     mainContextState: profilesContextState.mainContextState,
     transcript: voicePipelineState.LOG.map((x?: any): any => ({
       role: x.transcriptRole,
-      text: x.transcriptText ?? x.text ?? '',
-      age: x.age
+      text: x.transcriptText ?? x.text ?? ''
     })),
     talkTo: sceneFoundationState.talkTo,
     selection: profilesContextState.sel,
@@ -237,6 +234,11 @@ export function snapshotSession(raw: any = false): any {
         waiters,
         labels,
         debugRequest,
+        onlineSince,
+        speechLevel,
+        speaking,
+        think,
+        running,
         tm,
         E,
         spawnA,

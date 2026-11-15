@@ -4,7 +4,6 @@ import { createCodeAgentService } from './services/code-agent';
 import { codeAgentEnabled } from './services/code-settings';
 import { piMcpConfig, piMcpMutation } from './services/pi-mcp';
 import { searchMarketplace } from './services/marketplace';
-import { browsePiExtensions, managePiExtension } from './services/pi-extensions';
 import { aiEvent, chatRequest, streamAI } from './services/ai';
 
 const procedure = os.$context<{ request: Request }>();
@@ -29,9 +28,9 @@ export const hostRouter = {
       category: z.enum(['all', 'mcp', 'agents', 'providers', 'tools', 'memory', 'web', 'ui']).default('all'),
       sort: z.enum(['popularity', 'updated', 'name']).default('popularity'),
     }))
-      .handler(({ input }) => browsePiExtensions(input)),
+      .handler(async ({ input }) => (await import('./services/pi-extensions')).browsePiExtensions(input)),
     manage: procedure.input(z.object({ source: z.string().min(1).max(1000), action: z.enum(['install', 'uninstall', 'enable', 'disable']), trusted: z.boolean().default(false) }))
-      .handler(({ input }) => managePiExtension(input)),
+      .handler(async ({ input }) => (await import('./services/pi-extensions')).managePiExtension(input)),
   },
   code: {
     status: procedure.handler(() => ({ enabled: codeAgentEnabled(), workspace: process.env.JARVIS_CODE_ROOT || process.cwd(), shellAvailable: true })),

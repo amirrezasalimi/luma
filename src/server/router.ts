@@ -10,7 +10,14 @@ const session = z.object({ id: z.string().min(1), name: z.string(), updatedAt: z
 export const router = {
   host: hostRouter,
   persistence: {
-    preferences: os.handler(() => getDatabase().query<{ key: string; value: string }, []>('SELECT key,value FROM preferences').all()),
+    preferences: os.handler(() => getDatabase().query<{ key: string; value: string }, []>("SELECT key,value FROM preferences WHERE key NOT LIKE 'jarvis-actions-%'").all()),
+    preference: os.input(z.object({ key })).handler(({ input }) => {
+      // Do not materialize or serialize oversized legacy undo blobs into the RPC response.
+      const row = getDatabase().query<{ value: string | null; bytes: number }, [string]>(
+        'SELECT CASE WHEN length(CAST(value AS BLOB)) <= 2097152 THEN value ELSE NULL END AS value, length(CAST(value AS BLOB)) AS bytes FROM preferences WHERE key=?',
+      ).get(input.key);
+      return { value: row?.value ?? null, oversized: (row?.bytes || 0) > 2097152 };
+    }),
     writePreferences: os.input(z.array(entry).max(200)).handler(({ input }) => {
       const db = getDatabase();
       db.transaction(() => {
