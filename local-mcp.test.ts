@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createLocalMcpHandler } from './local-mcp';
+import { createLocalMcpHandler } from './src/server/services/local-mcp';
 
 let base: string;
 let oldEnabled: string | undefined;
@@ -70,12 +70,15 @@ test('missing absolute executable reports a launch error', async () => {
 });
 
 test('JSON importer accepts MixMusic config and preserves exportable stdio settings', async () => {
-  const html = await Bun.file(join(import.meta.dir, 'index.html')).text();
-  const start = html.indexOf('const validLocalMcpCommand=');
-  const end = html.indexOf('const sy=', start);
-  expect(start).toBeGreaterThan(-1);
+  const { addMcps } = await import('./src/shared/services/runtime/integrations');
+  const { validLocalMcpCommand } = await import('./src/shared/utils/mcp');
   const connected: unknown[] = [];
-  const add = new Function('mcpConnect', `let MC=[]; const MS=new Map(); const saveMC=()=>{},renderMcp=()=>{},stopLocalMcp=()=>{}; ${html.slice(start, end)}; return q=>({count:addMcps(q),configs:MC});`)((c: unknown) => connected.push(c));
+  const add = new Function('validLocalMcpCommand', 'mcpConnect', `
+    const integrationsState = { MC: [], MS: new Map(), validLocalMcpCommand, saveMC() {} };
+    const renderMcp = () => {}, stopLocalMcp = () => {};
+    const addMcps = ${addMcps.toString()};
+    return input => ({ count: addMcps(input), configs: integrationsState.MC });
+  `)(validLocalMcpCommand, (entry: unknown) => connected.push(entry));
   const mixmusic = { command: '/Applications/MixMusic.app/Contents/MacOS/MixMusic', args: ['--mcp'] };
   const result = add({ mcpServers: { mixmusic } });
   expect(result.count).toBe(1);

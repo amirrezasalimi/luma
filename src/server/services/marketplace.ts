@@ -24,9 +24,6 @@ const object = (value: unknown): value is ObjectValue =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 const records = (value: unknown): ObjectValue[] => Array.isArray(value) ? value.filter(object) : [];
 const text = (value: unknown): string => typeof value === 'string' ? value : '';
-const json = (value: unknown, status = 200) => Response.json(value, {
-  status, headers: { 'Cache-Control': 'no-store' },
-});
 class MarketplaceError extends Error {
   constructor(message: string, readonly status = 502, readonly retryAfter?: string) { super(message); }
 }
@@ -195,22 +192,8 @@ async function skills(q: string, cursor: string) {
   };
 }
 
-export async function marketplaceHandler(req: Request): Promise<Response> {
-  if (req.method !== 'GET') return new Response(JSON.stringify({ error: 'Use GET' }), {
-    status: 405, headers: { Allow: 'GET', 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-  });
-  const url = new URL(req.url);
-  const kind = url.searchParams.get('kind');
-  const q = (url.searchParams.get('q') ?? '').trim();
-  const cursor = url.searchParams.get('cursor') ?? '';
-  if (kind !== 'mcp' && kind !== 'skills') return json({ error: 'Expected kind=mcp or kind=skills' }, 400);
-  if (q.length > 512 || cursor.length > 4096) return json({ error: 'Search or cursor is too long' }, 400);
-  try {
-    return json(await (kind === 'mcp' ? mcp(q, cursor, req.signal) : skills(q, cursor)));
-  } catch (error) {
-    const failure = error instanceof MarketplaceError ? error : new MarketplaceError('Marketplace discovery failed');
-    const response = json({ error: failure.message }, failure.status);
-    if (failure.retryAfter) response.headers.set('Retry-After', failure.retryAfter);
-    return response;
-  }
+export async function searchMarketplace(input: { kind: 'mcp' | 'skills'; q: string; cursor?: string }, signal: AbortSignal) {
+  const q = input.q.trim(), cursor = input.cursor || '';
+  if (q.length > 512 || cursor.length > 4096) throw new MarketplaceError('Search or cursor is too long', 400);
+  return input.kind === 'mcp' ? mcp(q, cursor, signal) : skills(q, cursor);
 }

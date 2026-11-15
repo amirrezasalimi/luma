@@ -2,8 +2,17 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CODE_LIMITS, createCodeAgentHandler } from './code-agent';
-import { createServerHandler } from './server';
+import { CODE_LIMITS, createCodeAgentHandler } from './src/server/services/code-agent';
+import { validateLocalRequest } from './src/server/security';
+
+// Existing handler/security assertions do not depend on the deleted standalone host.
+function createServerHandler(options: { port?: number; codeEnabled?: boolean; codeRoot?: string } = {}) {
+  const handler = createCodeAgentHandler({
+    enabled: options.codeEnabled ?? Bun.env.JARVIS_CODE_AGENT === '1',
+    workspace: options.codeRoot ?? Bun.env.JARVIS_CODE_ROOT ?? import.meta.dir,
+  });
+  return async (request: Request) => validateLocalRequest(request, options.port ?? 3000) ?? handler(request);
+}
 
 let base: string, workspace: string;
 let handler: ReturnType<typeof createCodeAgentHandler>;

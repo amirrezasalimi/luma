@@ -1,3 +1,4 @@
+import { result, resultResponse, type ServiceResult } from './result';
 import { lstat, realpath, open, opendir, writeFile, rm, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -10,6 +11,13 @@ export const CODE_LIMITS = {
   defaultTimeoutMs: 30_000,
   maxTimeoutMs: 120_000,
 } as const;
+
+export type CodeResult =
+  | { error: { code: string; message: string } }
+  | { path: string; entries: { name: string; type: string }[]; truncated: boolean }
+  | { path: string; content: string }
+  | { ok: boolean; path: string; bytes?: number }
+  | { stdout: string; stderr: string; exitCode: number | null; signal: string | null; timedOut: boolean; aborted: boolean; truncated: boolean; error?: { code: string; message: string } };
 
 type Options = { enabled: boolean; workspace: string };
 class CodeError extends Error {
@@ -104,8 +112,8 @@ function checkContent(content: string) {
   if (Buffer.byteLength(content) > CODE_LIMITS.fileBytes) fail(413, 'FILE_TOO_LARGE', 'Content exceeds 1 MiB');
 }
 
-function bash(command: string, cwd: string, timeoutMs: number, abortSignal: AbortSignal): Promise<Response> {
-  if (abortSignal.aborted) return Promise.resolve(json({
+function bash(command: string, cwd: string, timeoutMs: number, abortSignal: AbortSignal): Promise<ServiceResult<CodeResult>> {
+  if (abortSignal.aborted) return Promise.resolve(result({
     stdout: '', stderr: '', exitCode: null, signal: null, timedOut: false, aborted: true, truncated: false,
     error: { code: 'SHELL_ABORTED', message: 'Shell request was aborted' },
   }, 499));
@@ -136,7 +144,7 @@ function bash(command: string, cwd: string, timeoutMs: number, abortSignal: Abor
       if (settled) return;
       settled = true;
       cleanup();
-      resolveResponse(json({
+      resolveResponse(result({
         stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8'),
         exitCode, signal, timedOut, aborted, truncated,
         ...(aborted ? { error: { code: 'SHELL_ABORTED', message: 'Shell request was aborted' } }
@@ -166,17 +174,12 @@ function bash(command: string, cwd: string, timeoutMs: number, abortSignal: Abor
   });
 }
 
-export function createCodeAgentHandler({ enabled, workspace }: Options) {
+export function createCodeAgentService({ enabled, workspace }: Options) {
   workspace = resolve(workspace);
-  return async (req: Request): Promise<Response> => {
+  return async (input: Record<string, unknown>, signal: AbortSignal): Promise<ServiceResult<CodeResult>> => {
     try {
-      if (req.method === 'GET') return json({ enabled, workspace, shellAvailable: true });
-      if (req.method !== 'POST') return fail(405, 'METHOD_NOT_ALLOWED', 'Use GET or POST');
       if (!enabled) return fail(403, 'DISABLED', 'Coding backend is disabled');
-      if (req.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
-        return fail(415, 'EXPECTED_JSON', 'Expected application/json');
-      }
-      const input = await inputJSON(req);
+      if (Buffer.byteLength(JSON.stringify(input)) > CODE_LIMITS.requestBytes) return fail(413, 'REQUEST_TOO_LARGE', 'JSON request exceeds 2 MiB');
       const op = text(input, 'op');
       if (!['list', 'read', 'write', 'edit', 'delete', 'bash'].includes(op)) {
         return fail(400, 'INVALID_OPERATION', 'Unknown coding operation');
@@ -191,7 +194,7 @@ export function createCodeAgentHandler({ enabled, workspace }: Options) {
         }
         const cwd = await confined(root, input.cwd ?? '.');
         if (!(await stat(cwd)).isDirectory()) return fail(400, 'NOT_DIRECTORY', 'cwd must be a directory');
-        return await bash(command, cwd, timeout, req.signal);
+        return await bash(command, cwd, timeout, signal);
       }
       const path = await confined(root, input.path ?? (op === 'list' ? '.' : undefined), op === 'write');
       if (op === 'list') {
@@ -203,15 +206,15 @@ export function createCodeAgentHandler({ enabled, workspace }: Options) {
           if (entries.length === CODE_LIMITS.listEntries) { truncated = true; break; }
           entries.push({ name: entry.name, type: entry.isSymbolicLink() ? 'symlink' : entry.isDirectory() ? 'directory' : entry.isFile() ? 'file' : 'other' });
         }
-        return json({ path: relative(root, path) || '.', entries, truncated });
+        return result({ path: relative(root, path) || '.', entries, truncated });
       }
-      if (op === 'read') return json({ path: relative(root, path), content: await readLimited(path) });
+      if (op === 'read') return result({ path: relative(root, path), content: await readLimited(path) });
       if (op === 'delete') {
         if (path === root || await realpath(path) === root) return fail(403, 'ROOT_DELETE', 'Cannot delete the workspace root');
         if (input.recursive !== undefined && typeof input.recursive !== 'boolean') return fail(400, 'INVALID_INPUT', 'recursive must be a boolean');
         if ((await lstat(path)).isDirectory() && input.recursive !== true) return fail(400, 'RECURSIVE_REQUIRED', 'Directory deletion requires recursive: true');
         await rm(path, { recursive: input.recursive === true });
-        return json({ ok: true, path: relative(root, path) });
+        return result({ ok: true, path: relative(root, path) });
       }
       let content: string;
       if (op === 'edit') {
@@ -232,13 +235,29 @@ export function createCodeAgentHandler({ enabled, workspace }: Options) {
         if (!(await stat(path)).isFile()) return fail(400, 'NOT_FILE', 'Expected a regular file');
       } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
       await writeFile(path, content, 'utf8');
-      return json({ ok: true, path: relative(root, path), bytes: Buffer.byteLength(content) });
+      return result({ ok: true, path: relative(root, path), bytes: Buffer.byteLength(content) });
     } catch (e) {
-      if (e instanceof CodeError) return json({ error: { code: e.code, message: e.message } }, e.status);
+      if (e instanceof CodeError) return result({ error: { code: e.code, message: e.message } }, e.status);
       const code = (e as NodeJS.ErrnoException).code;
       const status = code === 'ENOENT' ? 404 : ['EACCES', 'EPERM', 'ELOOP'].includes(code || '') ? 403
         : ['ENOTDIR', 'EISDIR', 'EINVAL', 'ENOTEMPTY'].includes(code || '') ? 400 : 500;
-      return json({ error: { code: code || 'INTERNAL_ERROR', message: status === 500 ? 'Coding operation failed' : 'Filesystem operation failed' } }, status);
+      return result({ error: { code: code || 'INTERNAL_ERROR', message: status === 500 ? 'Coding operation failed' : 'Filesystem operation failed' } }, status);
+    }
+  };
+}
+
+export function createCodeAgentHandler(options: Options) {
+  const execute = createCodeAgentService(options);
+  return async (request: Request): Promise<Response> => {
+    try {
+      if (request.method === 'GET') return json({ enabled: options.enabled, workspace: resolve(options.workspace), shellAvailable: true });
+      if (request.method !== 'POST') fail(405, 'METHOD_NOT_ALLOWED', 'Use GET or POST');
+      if (!options.enabled) fail(403, 'DISABLED', 'Coding backend is disabled');
+      if (request.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') fail(415, 'EXPECTED_JSON', 'Expected application/json');
+      return resultResponse(await execute(await inputJSON(request), request.signal));
+    } catch (error) {
+      if (error instanceof CodeError) return json({ error: { code: error.code, message: error.message } }, error.status);
+      throw error;
     }
   };
 }

@@ -1,10 +1,11 @@
+import { result as serviceResult, resultResponse, type ServiceResult } from './result';
 import { createHash } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 
 // SECURITY: this is host code execution, NOT a sandbox. Enabled by default;
 // set JARVIS_LOCAL_MCP=0 to disable. Accept only browser-user-confirmed configurations.
 // Executables, scripts and packages inherit the server user's filesystem/network
-// permissions (and environment). Never expose this handler without server.ts's
+// permissions (and environment). Never expose this handler without the RPC route's
 // loopback authority and same-origin checks. Confirmation belongs to the caller;
 // a JSON flag cannot prove that a human approved execution.
 //
@@ -32,7 +33,7 @@ const IDLE_TIMEOUT = 15 * 60_000;
 
 type Config = { name: string; command: string; args: string[]; env: Record<string, string> };
 type RPC = Record<string, unknown>;
-type Child = Bun.Subprocess<{ stdin: 'pipe'; stdout: 'pipe'; stderr: 'pipe' }>;
+type Child = Bun.Subprocess<'pipe', 'pipe', 'pipe'>;
 type Pending = { resolve: (value: RPC) => void; reject: (error: Error) => void };
 type Session = {
   key: string;
@@ -251,7 +252,7 @@ function startSession(key: string, config: Config): Session {
   return session;
 }
 
-async function send(session: Session, body: RPC, signal: AbortSignal): Promise<Response> {
+async function send(session: Session, body: RPC, signal: AbortSignal): Promise<ServiceResult<Record<string, unknown>>> {
   if (session.state !== 'running' || session.child.exitCode !== null) {
     terminate(session, 'Local MCP process exited; send stop before restarting');
     throw new LocalMcpError(session.reason ?? 'Session exited; send stop before restarting', 409);
@@ -285,7 +286,7 @@ async function send(session: Session, body: RPC, signal: AbortSignal): Promise<R
     const result = await Promise.race([
       Promise.all([write, response]).then(([, reply]) => reply), failure,
     ]);
-    return result ? json({ ...result, id: body.id }) : json({ ok: true }, 202);
+    return result ? serviceResult({ ...result, id: body.id }) : serviceResult({ ok: true }, 202);
   } catch (error) {
     terminate(session, 'MCP transport failed; send stop before restarting');
     throw error;
@@ -304,21 +305,17 @@ export function shutdownLocalMcpSessions() {
 }
 process.once('exit', shutdownLocalMcpSessions);
 
-export function createLocalMcpHandler() {
+export function createLocalMcpService() {
   const sessions = new Map<string, Session>();
-  return async (req: Request): Promise<Response> => {
-    if (req.method !== 'POST') return json({ error: 'Use POST' }, 405);
-    if (req.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
-      return json({ error: 'Expected application/json' }, 415);
-    }
+  return async (input: Record<string, unknown>, signal: AbortSignal): Promise<ServiceResult<Record<string, unknown>>> => {
     const enabled = process.env.JARVIS_LOCAL_MCP !== '0';
     const supported = typeof Bun !== 'undefined' && typeof Bun.spawn === 'function' && typeof Bun.which === 'function';
     try {
-      const input = await readInput(req);
+      if (Buffer.byteLength(JSON.stringify(input)) > REQUEST_LIMIT) throw new LocalMcpError('Request exceeds limit', 413);
       if (!object(input) || !['request', 'stop', 'status'].includes(input.action as string)) {
         throw new LocalMcpError('Expected action: request, stop, or status', 400);
       }
-      if (input.action === 'status' && input.config === undefined) return json({ enabled, supported });
+      if (input.action === 'status' && input.config === undefined) return serviceResult({ enabled, supported });
       if (!enabled || !supported) {
         throw new LocalMcpError('Local MCP execution disabled or unsupported. Requires Bun; JARVIS_LOCAL_MCP=0 disables execution. User-confirmed subprocesses run with full host-user permissions.', 403);
       }
@@ -334,25 +331,38 @@ export function createLocalMcpHandler() {
           // Do not release process capacity until the OS confirms the exit.
           void session.child.exited.finally(() => allSessions.delete(session)).catch(() => {});
         }
-        return json({ ok: true });
+        return serviceResult({ ok: true });
       }
       if (input.action === 'status') {
         const messages = session?.messages.splice(0) ?? [];
         if (session) session.messageBytes = 0;
-        return json({ enabled, supported, session: session ? {
+        return serviceResult({ enabled, supported, session: session ? {
           id: key, state: session.state, pid: session.child.pid, exitCode: session.exitCode,
           reason: session.reason, stderr: session.stderr, pending: session.pending.size,
           lastActivity: session.lastActivity,
         } : null, messages });
       }
       const body = parseRPC(input.body);
-      if (req.signal.aborted) throw new LocalMcpError('Request cancelled', 400);
+      if (signal.aborted) throw new LocalMcpError('Request cancelled', 400);
       const active = session ?? startSession(key, config);
       if (!session) sessions.set(key, active);
-      return await send(active, body, req.signal);
+      return await send(active, body, signal);
     } catch (error) {
-      return json({ error: error instanceof Error ? error.message : 'Local MCP request failed' },
+      return serviceResult({ error: error instanceof Error ? error.message : 'Local MCP request failed' },
         error instanceof LocalMcpError ? error.status : 502);
+    }
+  };
+}
+
+export function createLocalMcpHandler() {
+  const execute = createLocalMcpService();
+  return async (request: Request): Promise<Response> => {
+    if (request.method !== 'POST') return json({ error: 'Use POST' }, 405);
+    if (request.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') return json({ error: 'Expected application/json' }, 415);
+    try {
+      return resultResponse(await execute(await readInput(request) as Record<string, unknown>, request.signal));
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : 'Local MCP request failed' }, error instanceof LocalMcpError ? error.status : 502);
     }
   };
 }

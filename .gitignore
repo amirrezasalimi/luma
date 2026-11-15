@@ -4,3 +4,6 @@
 dist/
 .pages-publish/
 .DS_Store
+node_modules/
+.tanstack/
+data/
