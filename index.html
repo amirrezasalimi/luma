@@ -196,8 +196,8 @@ for(let i=0;i<NC;i++){const a=Math.random()*6.283,c=2*Math.random()-1,s=Math.sqr
 const SG=[.09,-.13,.18],TG=[0,.5,-.7];
 const rotationCache={time:NaN,cos:new Float64Array(3),sin:new Float64Array(3),tiltCos:TG.map(Math.cos),tiltSin:TG.map(Math.sin)};
 function rot(g,x,y,z,o){const r=rotationCache;if(r.time!==tm){r.time=tm;for(let i=0;i<3;i++){r.cos[i]=Math.cos(tm*SG[i]);r.sin[i]=Math.sin(tm*SG[i])}}const c=r.cos[g],s=r.sin[g],ct=r.tiltCos[g],st=r.tiltSin[g],a=x*c+z*s,b=-x*s+z*c;o[0]=(a*ct-y*st)*HSC;o[1]=(a*st+y*ct)*HSC;o[2]=b*HSC}
-const holoDebugDefaults={lineWidth:1,lineDensity:1,fade:1,darkShading:1,mainCoreScale:1,agentCount:3},holoDebugVisuals={...holoDebugDefaults};
-const holoVisualRanges={lineWidth:[1,4],lineDensity:[0,1],fade:[0,1],darkShading:[0,2],mainCoreScale:[.25,2],agentCount:[0,16]};
+const holoDebugDefaults={lineWidth:1,lineDensity:1,fade:1,darkShading:1,hueGradient:.65,mainCoreScale:1,agentCount:3},holoDebugVisuals={...holoDebugDefaults};
+const holoVisualRanges={lineWidth:[1,4],lineDensity:[0,1],fade:[0,1],darkShading:[0,2],hueGradient:[0,1],mainCoreScale:[.25,2],agentCount:[0,16]};
 try{const saved=JSON.parse(localStorage.getItem('jarvis-hologram-visuals')||'{}');for(const [key,[min,max]]of Object.entries(holoVisualRanges)){const value=saved?.[key];if(typeof value==='number'&&Number.isFinite(value))holoDebugVisuals[key]=Math.max(min,Math.min(max,['lineWidth','agentCount'].includes(key)?Math.round(value):value))}}catch(e){}
 function saveHologramVisuals(){try{localStorage.setItem('jarvis-hologram-visuals',JSON.stringify(holoDebugVisuals));return true}catch(e){console.warn('Could not save hologram visuals:',e);return false}}
 function seg(ax,ay,az,bx,by,bz,m,br){const a=proj(ax,ay,az),b=proj(bx,by,bz);let x0=a[0]|0,y0=a[1]|0;const x1=b[0]|0,y1=b[1]|0,dx=Math.abs(x1-x0),dy=-Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,n=Math.max(dx,-dy)||1;let e=dx+dy,i=0;
@@ -283,7 +283,7 @@ function stopRec(){clearSTTDebounce();if(rec){rec.onend=null;try{rec.abort()}cat
 function setMute(v){muted=v;stream&&stream.getAudioTracks().forEach(t=>t.enabled=!v);if(v){stopRec();chunks=[];talking=false;vc=0;if(mode==='listening')lab.text='MIC MUTED (M)'}else if(mode==='listening'){lab.text='LISTENING...';startRec()}}
 let sq=Promise.resolve(),speechEpoch=0,speechController=null;
 function cancelTurn(){turnId++;speechEpoch++;speechController?.abort();speechController=null;sq=Promise.resolve();aborted=true;turnController?.abort();turnController=null;stopSpeech();stopRec();chunks=[];prev=null;talking=false;quiet=0;vc=0;busy=false;if(mode!=='idle'){mode='listening';lab.text=muted?'MIC MUTED (M)':'LISTENING...';startRec()}}
-addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();stopVoiceDemo();cancelTurn();return}if(e.composedPath().some(n=>n instanceof Element&&(n.matches('form,input,textarea,select,button,a[href],[role="textbox"]')||n.isContentEditable))||e.defaultPrevented||e.isComposing)return;if(e.key==='Enter'&&!e.repeat&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&mode!=='idle'){e.preventDefault();stopVoiceDemo();cancelTurn();return}if(e.key==='m'||e.key==='M')setMute(!muted)});
+addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();stopVoiceDemo();cancelTurn();return}if(e.defaultPrevented||e.isComposing)return;if((e.key.toLowerCase()==='m'||e.code==='KeyM')&&!e.repeat&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.composedPath().some(n=>n instanceof Element&&(n.matches('textarea,select,[role="textbox"],input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"])')||n.isContentEditable))){e.preventDefault();setMute(!muted);return}if(e.composedPath().some(n=>n instanceof Element&&(n.matches('form,input,textarea,select,button,a[href],[role="textbox"]')||n.isContentEditable)))return;if(e.key==='Enter'&&!e.repeat&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&mode!=='idle'){e.preventDefault();stopVoiceDemo();cancelTurn();return}});
 function applyEngine(){stopRec();if(mode==='listening'&&!muted&&!busy){if(cfg.sttMode==='browser')startRec();else loadW().catch(console.error)}}
 function setEngine(){cfg.sttMode=cfg.sttMode==='browser'?'whistle':'browser';try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}applyEngine()}
 $('sv').addEventListener('click',()=>setTimeout(applyEngine,0));
@@ -360,6 +360,22 @@ function updateEnergy(dt){let level=0;
 const floorCache={geometryKey:[],radius:NaN,anchorKey:[],count:0};
 const hologramGlowMaterials=new Uint8Array(64);hologramGlowMaterials[1]=1;
 let glowMaterials,blurGlowMaterials;
+const mainHuePalette=new Uint32Array(128*4);
+function mainHueIndex(x,y,cx,cy,scale){return Math.max(0,Math.min(127,(((x-cx)*.65+(y-cy)*.75)*scale+63.5)|0))*4}
+function updateMainHuePalette(shading){
+ const amount=holoDebugVisuals.hueGradient,time=backgroundReducedMotion.matches?0:performance.now()/1000;
+ // Keep the original palette and shading; a narrow hue spread avoids unrelated rainbow colors.
+ for(let band=0;band<128;band++){
+  const angle=(band/127-.5)*1.1+time*.18+Math.sin(time*.25)*.2,c=Math.cos(angle),s=Math.sin(angle);
+  for(let level=0;level<4;level++){
+   const color=level<2?shading[level]:P[4+level],r=color&255,g=color>>>8&255,b=color>>>16&255;
+   const rr=(.213+.787*c-.213*s)*r+(.715-.715*c-.715*s)*g+(.072-.072*c+.928*s)*b;
+   const gg=(.213-.213*c+.143*s)*r+(.715+.285*c+.140*s)*g+(.072-.072*c-.283*s)*b;
+   const bb=(.213-.213*c-.787*s)*r+(.715-.715*c+.715*s)*g+(.072+.928*c+.072*s)*b;
+   mainHuePalette[band*4+level]=abgr([Math.round(r+(Math.max(0,Math.min(255,rr))-r)*amount),Math.round(g+(Math.max(0,Math.min(255,gg))-g)*amount),Math.round(b+(Math.max(0,Math.min(255,bb))-b)*amount)]);
+  }
+ }
+}
 const backgroundReducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function backgroundImageFilter(){return new PIXI.Filter(undefined,`
  varying vec2 vTextureCoord;
@@ -451,7 +467,9 @@ app.ticker.add(()=>{frameDebugMark();const now=performance.now(),dt=Math.min(.05
    const base=P[4+level],bright=P[6],amount=holoDebugVisuals.darkShading;
    mainShading[level]=abgr([0,8,16].map(shift=>{const dark=base>>>shift&255,light=bright>>>shift&255;return Math.round(amount<1?light+(dark-light)*amount:dark/amount)}));
   }
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,v=px[i];if(v!==255){u32[i]=v===4||v===5?mainShading[v-4]:P[v];continue}const l=Math.min(3,(gl[(y>>2)*GW+(x>>2)]*1.1+Bay[(y&3)*4+(x&3)]-.5)|0);if(l>0){u32[i]=stageBackground.image?((glowMaterials[(y>>2)*GW+(x>>2)]>1?P[glowMaterials[(y>>2)*GW+(x>>2)]*4+2]&0xffffff:imageGlow)|((l*24)<<24)):HZ[l-1];continue}u32[i]=stageBackground.image?0:BG}}
+  const hueEnabled=cfg.mainColorEffect===true&&holoDebugVisuals.hueGradient>0,hueCenter=proj(HX,HY,HQ),hueSpan=Math.max(1,HR*s*2),hueScale=127/hueSpan;
+  if(hueEnabled)updateMainHuePalette(mainShading);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,v=px[i];if(v!==255){if(hueEnabled&&v>=4&&v<8){const index=mainHueIndex(x,y,hueCenter[0],hueCenter[1],hueScale);u32[i]=mainHuePalette[index+(v&3)]}else u32[i]=v===4||v===5?mainShading[v-4]:P[v];continue}const l=Math.min(3,(gl[(y>>2)*GW+(x>>2)]*1.1+Bay[(y&3)*4+(x&3)]-.5)|0);if(l>0){u32[i]=stageBackground.image?((glowMaterials[(y>>2)*GW+(x>>2)]>1?P[glowMaterials[(y>>2)*GW+(x>>2)]*4+2]&0xffffff:hueEnabled?mainHuePalette[mainHueIndex(x,y,hueCenter[0],hueCenter[1],hueScale)+2]&0xffffff:imageGlow)|((l*24)<<24)):HZ[l-1];continue}u32[i]=stageBackground.image?0:BG}}
  frameDebugMark('glowAndOutputMs');
  if(stageBackground.image){const b=stageBackground,c=b.config;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const k=y*W+x;if(px[k]>=4)continue;const z=-((cy-y)/s)/sp_,wx=(x-cx)/s*cY-z*sY,wz=(x-cx)/s*sY+z*cY,t=Math.max(0,Math.min(7,Math.floor((wx-c.x)/c.width*8+4))),color=b.colors[t],strength=c.light*Math.exp(-Math.abs(wz-c.z)*.18)*Math.max(0,1-Math.abs(wx-c.x)/c.width);if(!color)continue;const v=u32[k];u32[k]=abgr([Math.min(255,(v&255)+color[0]*strength),Math.min(255,(v>>>8&255)+color[1]*strength),Math.min(255,(v>>>16&255)+color[2]*strength)])}}
  frameDebugMark('backgroundLightingMs');g2.putImageData(img,0,0);tex.baseTexture.update();frameDebugMark('canvasWriteMs');
@@ -1604,9 +1622,11 @@ const initialSessionDefaults={camera:{...cam},sceneDefaults:{...DEF},palettes:{P
 let sessionDB=null,activeSession=null,sessionReady=false,sessionWriting=false,sessionAgain=false,lastSnapshot='',sessionRestoring=false;
 const sessionUI=document.createElement('div');sessionUI.innerHTML='<h3>SESSIONS · INDEXEDDB</h3><p id="sessionStatus" class="mut" role="status">Opening session storage…</p><select id="sessionList" aria-label="Saved sessions"></select><div class="r"><button class="b" id="sessionLoad" type="button">LOAD SESSION</button><button class="b" id="sessionNew" type="button">NEW SESSION (N)</button><button class="b" id="sessionSave" type="button">SAVE NOW</button></div><p class="mut">Snapshots preserve stage data, source scripts/actions, panel layouts, agent conversations, history, colors and camera. Running agents restore paused. Browser closures, live timers, external command processes and media streams cannot be snapshotted. Widgets load automatically on refresh; other restored scene scripts are saved but not executed automatically. Resume scene scripts explicitly. Souls, soul-settings.md and connection settings are shared across sessions.</p>';settingsPages.get('main').append(sessionUI);
 const buildToolsSettings=document.createElement('div');buildToolsSettings.innerHTML='<h3>WORKSPACE TOOLS</h3><label class="ck"><input type="checkbox" id="showBuildTools"> Show Build Tools in the bottom-left corner</label><p class="mut">Hidden by default. Enable to manually create objects and edit scene scripts.</p>';settingsPages.get('main').append(buildToolsSettings);
+const colorEffectSetting=document.createElement('label');colorEffectSetting.className='ck';colorEffectSetting.innerHTML='<input type="checkbox" id="mainColorEffect"> Enable animated color mix on the main hologram';buildToolsSettings.append(colorEffectSetting);
+$('mainColorEffect').checked=cfg.mainColorEffect===true;
 $('showBuildTools').checked=cfg.showBuildTools===true;
-$('gear').addEventListener('click',()=>{$('showBuildTools').checked=cfg.showBuildTools===true});
-$('sv').addEventListener('click',()=>{cfg.showBuildTools=$('showBuildTools').checked;tlp.style.display=cfg.showBuildTools?'':'none';try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}});
+$('gear').addEventListener('click',()=>{$('showBuildTools').checked=cfg.showBuildTools===true;$('mainColorEffect').checked=cfg.mainColorEffect===true});
+$('sv').addEventListener('click',()=>{cfg.mainColorEffect=$('mainColorEffect').checked;cfg.showBuildTools=$('showBuildTools').checked;tlp.style.display=cfg.showBuildTools?'':'none';try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}});
 const stageControls=document.createElement('div');stageControls.innerHTML='<h3>STAGE BACKGROUND & PANELS</h3><label for="stageBackgroundURL">Background image URL</label><input id="stageBackgroundURL" placeholder="https://… or a local image path"><p class="mut">Image fills the viewport at full rendering resolution, stays fixed as the camera moves, and preserves its aspect ratio (cover crop). Sampled colors light the floor. Remote hosts must allow CORS. Saved per session.</p><div class="r"><button class="b" id="stageBackgroundSet">SET IMAGE</button><button class="b" id="stageBackgroundRemove">REMOVE IMAGE</button><button class="b" id="stagePanelLayout">ARRANGE PANELS</button></div><p id="stageBackgroundStatus" class="mut" role="status"></p>';settingsPages.get('main').append(stageControls);
 $('stageBackgroundSet').onclick=async()=>{try{$('stageBackgroundStatus').textContent='Loading…';await setStageBackground($('stageBackgroundURL').value);$('stageBackgroundStatus').textContent='Background applied'}catch(e){$('stageBackgroundStatus').textContent=e.message}};$('stageBackgroundRemove').onclick=()=>{setStageBackground(null);$('stageBackgroundURL').value='';$('stageBackgroundStatus').textContent='Background removed'};$('stagePanelLayout').onclick=()=>layoutPanels();$('gear').addEventListener('click',()=>{$('stageBackgroundURL').value=stageBackground.config.src||''});
 function sessionStatus(text){const status=$('sessionStatus');if(status)status.textContent=text;const warning=document.getElementById('session-storage-warning');if(/failed|unavailable|not being saved|blocked/i.test(text)){let notice=warning;if(!notice){notice=document.createElement('div');notice.id='session-storage-warning';notice.setAttribute('role','alert');notice.style.cssText='position:fixed;bottom:12px;left:12px;max-width:600px;z-index:99;padding:12px;background:#321020;color:#fff;border:1px solid #ff647c';document.body.append(notice)}notice.textContent=text}else if(text.startsWith('Saved '))warning?.remove()}
@@ -1671,7 +1691,7 @@ debugPanel.innerHTML='<div style="display:flex;justify-content:space-between;ali
 const debugVisualSection=document.createElement('fieldset');debugVisualSection.style.cssText='border:1px solid var(--line);margin:12px 0;padding:10px';
 const debugVisualLegend=document.createElement('legend');debugVisualLegend.textContent='HOLOGRAM VISUALS · live, saved across reloads';debugVisualSection.append(debugVisualLegend);
 const debugVisualInputs=[];
-for(const [key,label,min,max,step]of[['lineWidth','Line width (raster pixels)',1,4,1],['lineDensity','Line density',0,1,.05],['fade','Line fade (0 = uniform, 1 = normal)',0,1,.05],['darkShading','Main dark shading (0 = off, 1 = normal)',0,2,.05],['mainCoreScale','Main core sphere size',.25,2,.05],['agentCount','Sub-agent orbiting particle count',0,16,1]]){
+for(const [key,label,min,max,step]of[['lineWidth','Line width (raster pixels)',1,4,1],['lineDensity','Line density',0,1,.05],['fade','Line fade (0 = uniform, 1 = normal)',0,1,.05],['darkShading','Main dark shading (0 = off, 1 = normal)',0,2,.05],['hueGradient','Main color mix (0 = off)',0,1,.05],['mainCoreScale','Main core sphere size',.25,2,.05],['agentCount','Sub-agent orbiting particle count',0,16,1]]){
  const row=document.createElement('label'),name=document.createElement('span'),input=document.createElement('input'),value=document.createElement('output');row.style.cssText='display:grid;grid-template-columns:1fr 140px 35px;gap:8px;align-items:center;margin:8px 0';name.textContent=label;input.type='range';input.min=min;input.max=max;input.step=step;input.value=holoDebugVisuals[key];input.setAttribute('aria-label',label);value.textContent=input.value;
  input.oninput=()=>{holoDebugVisuals[key]=Number(input.value);value.textContent=input.value};input.onchange=()=>{debugVisualLegend.textContent=saveHologramVisuals()?'HOLOGRAM VISUALS · live, saved across reloads':'HOLOGRAM VISUALS · storage unavailable, changes not saved'};row.append(name,input,value);debugVisualSection.append(row);debugVisualInputs.push({key,input,value});
 }
