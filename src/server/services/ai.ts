@@ -38,7 +38,7 @@ export const aiEvent = z.discriminatedUnion('type', [
   ]) }),
 ]);
 
-/** Pi owns the native tool loop; Jarvis owns conversation snapshots and scene execution. */
+/** Pi owns the native tool loop; Luma owns conversation snapshots and scene execution. */
 export async function runAI(input: z.output<typeof chatRequest>, apiKey: string, signal: AbortSignal,
   onText: (text: string) => void, onEvent: (event: PiEvent) => void = () => {}, onOperation: (event: WorkspaceOperation) => void = () => {}) {
   const { createAgentSession, createCodemodeExtension, createMcpExtension, createToolSearchExtension, DefaultResourceLoader, getAgentDir, ModelRuntime, SessionManager, SettingsManager } = await import('@earendil-works/pi-coding-agent');
@@ -49,7 +49,7 @@ export async function runAI(input: z.output<typeof chatRequest>, apiKey: string,
     // Credentials are always request-scoped, even when trusted resources are enabled.
     const runtime = await ModelRuntime.create({ modelsPath: null, refreshOnCreate: false,
       credentials: { read: async () => undefined, list: async () => [], modify: async (_provider, fn) => fn(undefined), delete: async () => {} } });
-    runtime.registerProvider('jarvis', {
+    runtime.registerProvider('luma', {
       baseUrl: input.endpoint.replace(/\/$/, ''), api: 'openai-completions',
       authHeader: true,
       models: [{ id: input.model, name: input.model, reasoning: !!input.reasoning_effort && input.reasoning_effort !== 'off',
@@ -58,8 +58,8 @@ export async function runAI(input: z.output<typeof chatRequest>, apiKey: string,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }],
     });
     // Runtime keys are literal values (not Pi configuration expressions).
-    await runtime.setRuntimeApiKey('jarvis', apiKey || 'local-no-key');
-    const model = runtime.getModel('jarvis', input.model);
+    await runtime.setRuntimeApiKey('luma', apiKey || 'local-no-key');
+    const model = runtime.getModel('luma', input.model);
     if (!model) throw new Error('Pi could not configure the selected model');
     const manager = SessionManager.inMemory();
     for (const message of history.slice(0, -1)) {
@@ -71,7 +71,7 @@ export async function runAI(input: z.output<typeof chatRequest>, apiKey: string,
     }
     // Conversations use the same enabled user resources and MCP configuration as Pi.
     const resources = input.purpose !== 'summary';
-    const cwd = process.env.JARVIS_CODE_ROOT || process.cwd();
+    const cwd = process.env.LUMA_CODE_ROOT || process.cwd();
     const globalSettings = resources ? SettingsManager.create(cwd, getAgentDir()).getGlobalSettings() : {};
     const settingsManager = SettingsManager.inMemory({ ...globalSettings, compaction: { enabled: false }, retry: { enabled: false } });
     const storedSoul = resources ? readSoul(input.profile) : '';
@@ -100,7 +100,7 @@ export async function runAI(input: z.output<typeof chatRequest>, apiKey: string,
        ...(hostEnabled ? { tools: ['+read', '+write', '+edit', '+bash', '+grep', '+find', '+ls'] } : { noTools: 'builtin' as const }),
         customTools: [
           ...(resources && input.session_id ? [graphMemoryTool(input.session_id, input.profile)] : []),
-         ...(resources && input.session_id ? [sceneTool(input.session_id, input.profile || 'jarvis'), sceneStatusTool(input.session_id), sceneApiTool()] : []),
+         ...(resources && input.session_id ? [sceneTool(input.session_id, input.profile || 'luma'), sceneStatusTool(input.session_id), sceneApiTool()] : []),
          ...(resources ? [sessionHistoryTool(input.session_id)] : []),
          ...(resources && input.session_id && !input.profile ? [managementTool(input.session_id, onOperation, async operation => {
            const { manageBackendAgents } = await import('./ai-runs');

@@ -1,6 +1,6 @@
 # Factual graph memory
 
-Jarvis wraps pinned `@oh-my-pi/pi-mnemopi@18.20.2` through the native
+Luma wraps pinned `@oh-my-pi/pi-mnemopi@18.20.2` through the native
 `graph_memory` tool. Requires Bun >= 1.4.4. The integration is independent of
 OMP's agent/session wrapper.
 
@@ -20,7 +20,7 @@ OMP's agent/session wrapper.
   are preserved for inspection. Original databases remain untouched. Legacy
   retired facts stay in the original archive and are not restored to recall.
 - Files live beside the app database in `graph-memory/`; override with
-  `JARVIS_MEMORY_DIR`. New directory/file permissions are 0700/0600. Back up this
+  `LUMA_MEMORY_DIR`. New directory/file permissions are 0700/0600. Back up this
   directory separately alongside the app database.
 - Embeddings, the additional memory LLM, proactive linking and automatic
   extraction are explicitly disabled. No models are downloaded by this adapter.
@@ -37,7 +37,7 @@ OMP's agent/session wrapper.
 | `forget` | id | Retires one triple and removes its memory from recall |
 | `status` | — | Counts and configuration, no full graph dump |
 
-For example: `{"action":"remember","subject":"Jarvis","predicate":"uses_database","object":"SQLite","source":"src/server/database.ts","evidence":"import { Database } from 'bun:sqlite';"}`.
+For example: `{"action":"remember","subject":"Luma","predicate":"uses_database","object":"SQLite","source":"src/server/database.ts","evidence":"import { Database } from 'bun:sqlite';"}`.
 
 Subject/object matching is exact after Unicode normalization and whitespace
 trimming; predicates are also lowercased. Reuse consistent entity names.
@@ -54,7 +54,7 @@ Results are bounded by field sizes and a four-fact maximum (roughly 7 KB of text
 before JSON escaping), and marked untrusted. No per-turn graph dump, persistent
 open-handle cache, background extraction, or consolidation jobs. Database
 creation occurs only when memory is accessed; handles close after each
-operation. Tool calls use Jarvis's existing tool-history auditing.
+operation. Tool calls use Luma's existing tool-history auditing.
 
 This adapter uses Mnemopi's TripleStore, remember/recall/forget APIs plus a small
 mapping table in each scoped database. SQL reads provide bounded pagination and

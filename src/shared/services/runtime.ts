@@ -8,7 +8,7 @@ import { connectSettings } from './runtime/settings-service';
 
 let startup: Promise<void> | undefined;
 
-export function startJarvis(): Promise<void> {
+export function startLuma(): Promise<void> {
   return startup ??= startRuntime();
 }
 

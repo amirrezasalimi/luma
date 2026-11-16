@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { JarvisConfig } from '../../../stores/settings';
+import type { LumaConfig } from '../../../stores/settings';
 import { useRuntimeSettings, type SettingsServices, type VoiceOption } from '../../services/settings';
 import { Action, Field, ReasoningOptions, Select, Toggle } from './controls';
 
 export function VoiceSettings({ services, draft, patch }: {
-  services: SettingsServices; draft: JarvisConfig; patch(values: Partial<JarvisConfig>): void;
+  services: SettingsServices; draft: LumaConfig; patch(values: Partial<LumaConfig>): void;
 }) {
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [text, setText] = useState('Hello. I am Luma, ready when you are.');

@@ -10,7 +10,7 @@ import { addObj, delObj } from './scene-objects';
 export function bindWorkspaceInput(): void {
   // ---------------- 16b. Pointer selection (objects + mini-holos) & keyboard ----------------
   cameraInputState.V.addEventListener('pointerup', (e?: any): any => {
-    if (cameraInputState.moved >= 6 || e.jarvisAgentSelected) return;
+    if (cameraInputState.moved >= 6 || e.lumaAgentSelected) return;
     const r: any = cameraInputState.V.getBoundingClientRect(),
       k: any = cameraInputState.V.width / r.width,
       x: any = (e.clientX - r.left) * k,

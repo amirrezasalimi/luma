@@ -1,10 +1,8 @@
-# JARVIS
+# Luma
 
 A browser-based voice assistant with a holographic visualization, streaming AI responses, and locally hosted speech models.
 
-**[Launch JARVIS →](https://amirrezasalimi.github.io/jarvis/)**
-
-![JARVIS holographic voice assistant](screenshot.png)
+Run Luma locally with Bun; the application requires its Bun server for AI tools and persistence.
 
 ## Features
 
@@ -17,7 +15,7 @@ A browser-based voice assistant with a holographic visualization, streaming AI r
 
 ## Getting started
 
-1. Open the [live app](https://amirrezasalimi.github.io/jarvis/).
+1. Follow [Run locally](#run-locally), then open **http://localhost:3000**.
 2. Open **Settings** using the gear button.
 3. Configure your OpenAI-compatible endpoint, API key, and model. The endpoint should be the API base URL, such as `https://api.openai.com/v1`; the app appends `/chat/completions`.
 4. Choose an STT engine and TTS voice, then **Save**.
@@ -78,7 +76,7 @@ TanStack Start runs in SPA mode for browser-only WebGL/audio/workers. The build 
 - `src/routes/index.tsx`: home route and client-only scene startup.
 - `src/shared/components/settings/SettingsDialog.tsx`: React-owned settings dialog, accessible tab navigation, draft Save/Close flow.
 - `src/shared/components/settings/`: React tabs for voice, agents/context, souls, code access, skills, MCP, marketplace and workspace/session controls. No HTML injection or nested React roots.
-- `src/stores/settings.ts`: Zustand + Immer configuration store; preserves the flat `jarvis-cfg` storage format and unknown saved fields.
+- `src/stores/settings.ts`: Zustand + Immer configuration store; preserves the flat `luma-cfg` storage format and unknown saved fields.
 - `src/shared/services/settings.ts`: typed commands and runtime status subscriptions. Scene/audio resources stay in the runtime, outside React state.
 - `src/styles/app.css`: extracted application styles.
 - `src/shared/services/runtime.ts`: small browser-only startup coordinator; subsystem entry points (`scene.ts`, `audio.ts`, `agents.ts`, `workspace.ts`, `sessions.ts`) own their internal setup. Rendering starts after dependencies exist, and startup awaits initial session restoration.
@@ -106,7 +104,7 @@ bun run dev
 
 Open `http://localhost:3000`. **Settings → Marketplace** searches the official MCP Registry and `SKILL.md` files in Anthropic, OpenAI and Vercel's skill repositories. Results include source/configuration metadata and pagination. GitHub/registry requests require internet and may be rate limited. Skill installation imports the instruction file only, not supporting scripts or assets. Imports are saved **disabled**: review skill instructions in Skills or MCP configuration in MCP Servers, then use the enable checkbox. MCP entries have Edit JSON, Reconnect and Delete controls. Some registry entries require manual credentials/arguments and cannot be launched without configuration; unsupported transports are not auto-converted.
 
-Local stdio MCP execution is enabled by default when running `bun run dev`; no environment flag is needed. To disable host process execution for MCP, start with `JARVIS_LOCAL_MCP=0 bun run dev`.
+Local stdio MCP execution is enabled by default when running `bun run dev`; no environment flag is needed. To disable host process execution for MCP, start with `LUMA_LOCAL_MCP=0 bun run dev`.
 
 In Marketplace's **Local MCP** form, enter `bun`, `bunx` or an absolute executable path, a JSON argument array and optional environment variables. Save disabled, then enable in MCP Servers and confirm the execution warning. For example, a filesystem server may use `bunx` with `["@modelcontextprotocol/server-filesystem", "/absolute/allowed/path"]`. Follow the package's actual documentation and scope access narrowly. `bunx` downloads/caches packages on first launch; saving a config does not install or launch it. Native stdio executables are supported through absolute paths, including paths containing spaces. Commands launch directly without a shell; relative executable paths and other bare command names are rejected. Local programs run with your full host-user permissions. JSON imports also accept `{ "mcpServers": { "name": { "command": "bunx", "args": ["package"], "env": {}, "on": false } } }`.
 
@@ -167,13 +165,15 @@ Build Tools starts collapsed in a new session; an existing session's saved expan
 
 ### Sessions and persistent memory
 
-The stage is automatically snapshotted to **server SQLite on the autosave loop (currently every 500ms when changed)**, on visibility changes and when explicitly saved. On startup, Jarvis restores the most recently active session. **Settings → Main LLM → Sessions** lets you save now or switch to an older session. Press **N** outside a text field to open the new-session confirmation modal: the current session is saved before the new session starts.
+The stage is automatically snapshotted to **server SQLite on the autosave loop (currently every 500ms when changed)**, on visibility changes and when explicitly saved. On startup, Luma restores the most recently active session. **Settings → Main LLM → Sessions** lets you save now or switch to an older session. Press **N** outside a text field to open the new-session confirmation modal: the current session is saved before the new session starts.
 
 Snapshots include stage object properties/colors/variables, script source, panels and positions, GUI fields/images/action source, hologram colors/labels, camera, main history, agent histories/logs and agent model/runtime metadata. Agent context/log entries trimmed for display are archived in the session. Running agents restore stopped; idle agents remain idle. Saved scripts and GUI/label actions are **not executed automatically**: use **Resume Saved Scripts / Actions** in the Sessions section after reviewing the session. JavaScript closures, live timers, in-progress animations, media streams and external host processes cannot be faithfully serialized; a saved function relying on a closure may need to be recreated by an agent. Session changes stop agent/tool requests and invalidate old snippet APIs, but host process cancellation remains best effort.
 
 **Souls, `soul-settings.md`, LLM settings, skills and MCP configuration are shared across sessions.** Edit/reset `soul-settings.md` in **Souls & Memory** to control permanent memory guidance; resetting it does not delete souls or sessions. These markdown documents are stored in SQLite, not host filesystem files.
 
-The database defaults to `data/jarvis.sqlite` (override with `JARVIS_DATABASE`). Clearing browser data no longer deletes saved state. Back up the SQLite database with its WAL consistently, or stop the server before copying it. Sessions contain sensitive conversation/file/tool output. Use one active tab at a time to avoid competing session updates; this is a local single-user host, not an authenticated multi-user service.
+The database defaults to `data/luma.sqlite` (override with `LUMA_DATABASE`). Clearing browser data no longer deletes saved state. Back up the SQLite database with its WAL consistently, or stop the server before copying it. Sessions contain sensitive conversation/file/tool output. Use one active tab at a time to avoid competing session updates; this is a local single-user host, not an authenticated multi-user service.
+
+Luma uses `LUMA_*` environment variables, `luma-*` preference keys, and the native `luma_host` tool. Previous project names and storage namespaces are not supported or automatically migrated. Existing local files are left untouched.
 
 ### Images, souls and idle agents
 
@@ -183,7 +183,7 @@ Agents can add single images or image sliders to GUI panels. Click an image to e
 
 **Settings → SOUL.md** contains the main agent's persistent markdown identity and memory. It is attached to every main-agent request, separately from the system prompt. Soul edits save immediately. Agents can read their own `soul()` and persist a replacement with `update_soul(markdown)` or append with `update_soul(markdown, true)`.
 
-Saved sub-agent soul profiles have a name, markdown soul, unlimited-step option and an optional **Load idle on page open** setting. **LOAD IDLE** creates the hologram without sending an LLM request; give it a task through its message box or ask Jarvis to tell it what to do. The **NEW AGENT** form also accepts a soul without a task. A task and soul are both optional: an agent with neither starts idle, with no initial LLM request. The main agent can specify an exact model ID using `spawn_agent("Coder", "Task", {model: "model-id"})` or `[[agent Coder | Task | model-id]]`. Without a model override, new agents use the sub-agent default, falling back to the main model. `spawn_agent("Helper")` or `[[agent Helper]]` creates an idle agent. An existing running agent must be stopped before its model is changed, or a separate agent can be created with `force:true`. Saved profiles survive reloads; session state and conversation histories are restored separately from SQLite, with active tasks paused rather than automatically resumed.
+Saved sub-agent soul profiles have a name, markdown soul, unlimited-step option and an optional **Load idle on page open** setting. **LOAD IDLE** creates the hologram without sending an LLM request; give it a task through its message box or ask Luma to tell it what to do. The **NEW AGENT** form also accepts a soul without a task. A task and soul are both optional: an agent with neither starts idle, with no initial LLM request. The main agent can specify an exact model ID using `spawn_agent("Coder", "Task", {model: "model-id"})` or `[[agent Coder | Task | model-id]]`. Without a model override, new agents use the sub-agent default, falling back to the main model. `spawn_agent("Helper")` or `[[agent Helper]]` creates an idle agent. An existing running agent must be stopped before its model is changed, or a separate agent can be created with `force:true`. Saved profiles survive reloads; session state and conversation histories are restored separately from SQLite, with active tasks paused rather than automatically resumed.
 
 Each sub-agent's expanded controls have a **LIMITED / UNLIMITED** toggle. Unlimited removes the step cap across runs, not completion, failure or Stop behavior. It can incur ongoing API costs. Agents can use `idle()` to wait without polling, and `done(summary)` to finish. From agent JavaScript, `spawn_agent(name, goal, {soul, unlimited:true, idle:true})` can create a soul-first idle agent.
 
@@ -196,7 +196,7 @@ Souls are stored in the server SQLite database, and sent to the configured LLM p
 Requires [Bun](https://bun.sh). The static site and Python server cannot run host tools.
 
 ```sh
-JARVIS_CODE_AGENT=1 bun run dev
+LUMA_CODE_AGENT=1 bun run dev
 ```
 
 Open **http://localhost:3000**, then enable **Settings → Code Agent → Enable host coding tools**. The toggle saves immediately and applies to both main and sub-agents. Both the server flag and browser toggle must be enabled. Start with `bun run dev` (without the flag) to disable the backend entirely.
@@ -204,7 +204,7 @@ Open **http://localhost:3000**, then enable **Settings → Code Agent → Enable
 The default workspace is this project directory. To use another existing directory:
 
 ```sh
-JARVIS_CODE_AGENT=1 JARVIS_CODE_ROOT=/absolute/path/to/workspace bun run dev
+LUMA_CODE_AGENT=1 LUMA_CODE_ROOT=/absolute/path/to/workspace bun run dev
 ```
 
 Agents can list/read/write/edit/delete files and execute Bash through same-origin oRPC code procedures. File tools reject paths and symlinks outside the workspace; write parents must exist and edits require a unique exact match. Limits: 1 MiB per file, 2 MiB per request, 1,000 listing entries, 256 KiB shell output, and a 30-second default shell timeout (120 seconds maximum).
@@ -229,7 +229,7 @@ bun run build
 bun run start
 ```
 
-Keep the process bound to loopback behind an appropriately secured same-origin access path, and back up `data/jarvis.sqlite` with its WAL consistently.
+Keep the process bound to loopback behind an appropriately secured same-origin access path, and back up `data/luma.sqlite` with its WAL consistently.
 
 ## Privacy and API keys
 

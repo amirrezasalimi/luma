@@ -28,7 +28,7 @@ export function act(action: any, by?: string, agent?: any): string {
   if (op === 'panel_update') return updPanel(String(action.id), action) ? 'panel updated' : 'err no panel';
   if (op === 'panel_delete') return delPanel(String(action.id)) ? 'panel deleted' : 'err no panel';
   if (op === 'tell_peer' || op === 'peer') {
-    if (!agent?.peers?.size) return 'err peer communication not authorized by Jarvis';
+    if (!agent?.peers?.size) return 'err peer communication not authorized by Luma';
     const target = mainOrchestratorState.findA(action.to || action.agent || action.id);
     if (!target) return 'err peer not found: ' + (action.to || action.agent);
     if (!agent.peers.has('*') && !agent.peers.has(target.name.toLowerCase()) && !agent.peers.has(target.id)) return 'err not authorized to talk to ' + target.name;

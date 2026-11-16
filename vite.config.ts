@@ -30,7 +30,7 @@ export default defineConfig({
   },
   plugins: [
     {
-      name: 'jarvis-bun-memory-externals',
+      name: 'luma-bun-memory-externals',
       enforce: 'pre',
       resolveId(source, _importer, options) {
         // TanStack's SSR bundling can override ssr.external for source
@@ -43,7 +43,7 @@ export default defineConfig({
     tanstackStart({ spa: { enabled: true, prerender: { outputPath: '/index.html' } } }),
     react(),
     {
-      name: 'jarvis-local-assets',
+      name: 'luma-local-assets',
       configureServer(server) {
         server.middlewares.use(async (req, res, next) => {
           try {
@@ -59,7 +59,7 @@ export default defineConfig({
       },
     },
     {
-      name: 'jarvis-runtime-reload',
+      name: 'luma-runtime-reload',
       handleHotUpdate({ file, server }) {
         // The imperative scene owns workers, audio and global listeners. Never mount it twice.
         if (file.includes('/src/shared/services/')) {

@@ -14,7 +14,7 @@ export const GRAPH_MEMORY_GUIDANCE = 'FACTUAL GRAPH MEMORY: Use graph_memory for
 function openMemory(session: string, profile?: string) {
   const normalizedProfile = profile?.trim().toLowerCase() || null;
   const scope = createHash('sha256').update(JSON.stringify(['workspace-v2', normalizedProfile])).digest('hex');
-  const root = resolve(process.env.JARVIS_MEMORY_DIR || join(dirname(resolve(process.env.JARVIS_DATABASE || 'data/jarvis.sqlite')), 'graph-memory'));
+  const root = resolve(process.env.LUMA_MEMORY_DIR || join(dirname(resolve(process.env.LUMA_DATABASE || 'data/luma.sqlite')), 'graph-memory'));
   mkdirSync(root, { recursive: true, mode: 0o700 });
   const dbPath = join(root, scope + '.sqlite');
   const memory = new Mnemopi({ dbPath, bank: scope, sessionId: scope,
@@ -23,14 +23,14 @@ function openMemory(session: string, profile?: string) {
   try {
     chmodSync(dbPath, 0o600);
     const triples = new TripleStore(memory.db);
-    memory.db.exec(`CREATE TABLE IF NOT EXISTS jarvis_graph_facts (
+    memory.db.exec(`CREATE TABLE IF NOT EXISTS luma_graph_facts (
       triple_id INTEGER PRIMARY KEY, memory_id TEXT NOT NULL UNIQUE, evidence TEXT NOT NULL,
       recorded_at TEXT NOT NULL, retired_at TEXT
-    ); CREATE INDEX IF NOT EXISTS jarvis_graph_subject ON triples(subject, predicate, valid_until);
-    CREATE INDEX IF NOT EXISTS jarvis_graph_object ON triples(object, id);`);
-    const columns = memory.db.query('PRAGMA table_info(jarvis_graph_facts)').all() as { name: string }[];
-    if (!columns.some(column => column.name === 'session_id')) memory.db.exec('ALTER TABLE jarvis_graph_facts ADD COLUMN session_id TEXT');
-    memory.db.exec('CREATE TABLE IF NOT EXISTS jarvis_graph_imports (path TEXT PRIMARY KEY)');
+    ); CREATE INDEX IF NOT EXISTS luma_graph_subject ON triples(subject, predicate, valid_until);
+    CREATE INDEX IF NOT EXISTS luma_graph_object ON triples(object, id);`);
+    const columns = memory.db.query('PRAGMA table_info(luma_graph_facts)').all() as { name: string }[];
+    if (!columns.some(column => column.name === 'session_id')) memory.db.exec('ALTER TABLE luma_graph_facts ADD COLUMN session_id TEXT');
+    memory.db.exec('CREATE TABLE IF NOT EXISTS luma_graph_imports (path TEXT PRIMARY KEY)');
     migrateSessionFacts(memory, root, session, normalizedProfile);
     return { memory, triples };
   } catch (error) { memory.close(); throw error; }
@@ -47,14 +47,14 @@ function migrateSessionFacts(memory: Mnemopi, root: string, session: string, pro
   for (const id of ids) {
     const hash = createHash('sha256').update(JSON.stringify([id, profile])).digest('hex');
     const path = join(root, hash + '.sqlite');
-    if (!existsSync(path) || memory.db.query('SELECT 1 FROM jarvis_graph_imports WHERE path=?').get(hash)) continue;
+    if (!existsSync(path) || memory.db.query('SELECT 1 FROM luma_graph_imports WHERE path=?').get(hash)) continue;
     const legacy = new Database(path, { readonly: true });
     try {
       const facts = legacy.query(`SELECT t.*, f.evidence,f.recorded_at FROM triples t
-        JOIN jarvis_graph_facts f ON f.triple_id=t.id WHERE f.retired_at IS NULL AND t.valid_until IS NULL`).all() as GraphFact[];
+        JOIN luma_graph_facts f ON f.triple_id=t.id WHERE f.retired_at IS NULL AND t.valid_until IS NULL`).all() as GraphFact[];
       memory.db.transaction(() => {
         for (const fact of facts) {
-          const existing = memory.db.query(`SELECT 1 FROM triples t JOIN jarvis_graph_facts f ON f.triple_id=t.id
+          const existing = memory.db.query(`SELECT 1 FROM triples t JOIN luma_graph_facts f ON f.triple_id=t.id
             WHERE t.subject=? AND t.predicate=? AND t.object=? AND f.retired_at IS NULL`).get(fact.subject, fact.predicate, fact.object);
           if (existing) continue;
           const result = memory.db.run(`INSERT INTO triples(subject,predicate,object,valid_from,source,confidence) VALUES(?,?,?,?,?,?)`,
@@ -64,10 +64,10 @@ function migrateSessionFacts(memory: Mnemopi, root: string, session: string, pro
             source: fact.source, extract: false, extractEntities: false, scope: 'bank', memoryType: 'fact',
             metadata: { tripleId, evidence: fact.evidence, originSession: id },
           });
-          memory.db.run(`INSERT INTO jarvis_graph_facts(triple_id,memory_id,evidence,recorded_at,session_id) VALUES(?,?,?,?,?)`,
+          memory.db.run(`INSERT INTO luma_graph_facts(triple_id,memory_id,evidence,recorded_at,session_id) VALUES(?,?,?,?,?)`,
             [tripleId, memoryId, fact.evidence, fact.recorded_at, id]);
         }
-        memory.db.run('INSERT INTO jarvis_graph_imports(path) VALUES(?)', [hash]);
+        memory.db.run('INSERT INTO luma_graph_imports(path) VALUES(?)', [hash]);
       })();
     } finally { legacy.close(); }
   }
@@ -84,11 +84,11 @@ export async function graphMemoryPage(input: { session: string; profile?: string
   const { memory } = openMemory(input.session, input.profile);
   try {
     const query = (input.query || '').trim();
-    const rows = memory.db.query(`SELECT ${fields} FROM triples t JOIN jarvis_graph_facts f ON f.triple_id=t.id
+    const rows = memory.db.query(`SELECT ${fields} FROM triples t JOIN luma_graph_facts f ON f.triple_id=t.id
       WHERE f.retired_at IS NULL AND t.valid_until IS NULL AND t.id>?
       AND (?='' OR instr(lower(t.subject || ' ' || t.predicate || ' ' || t.object),lower(?))>0)
       ORDER BY t.id LIMIT 61`).all(input.after ?? 0, query, query) as GraphFact[];
-    const counts = memory.db.query('SELECT COUNT(*) AS active FROM jarvis_graph_facts WHERE retired_at IS NULL').get() as { active: number };
+    const counts = memory.db.query('SELECT COUNT(*) AS active FROM luma_graph_facts WHERE retired_at IS NULL').get() as { active: number };
     return { facts: rows.slice(0, 60), nextAfter: rows.length > 60 ? rows[59]!.id : null, total: counts.active };
   } finally { memory.close(); }
 }
@@ -97,12 +97,12 @@ const fields = 't.id,t.subject,t.predicate,t.object,t.source,t.confidence,f.evid
 
 function retireFact(memory: Mnemopi, id: number) {
   return memory.db.transaction(() => {
-    const fact = memory.db.query('SELECT memory_id FROM jarvis_graph_facts WHERE triple_id=? AND retired_at IS NULL').get(id) as { memory_id: string } | null;
+    const fact = memory.db.query('SELECT memory_id FROM luma_graph_facts WHERE triple_id=? AND retired_at IS NULL').get(id) as { memory_id: string } | null;
     if (!fact) throw new Error('Active fact not found in this scope');
     memory.forget(fact.memory_id);
     const now = new Date().toISOString();
     memory.db.run('UPDATE triples SET valid_until=? WHERE id=?', [now, id]);
-    memory.db.run('UPDATE jarvis_graph_facts SET retired_at=? WHERE triple_id=?', [now, id]);
+    memory.db.run('UPDATE luma_graph_facts SET retired_at=? WHERE triple_id=?', [now, id]);
     return { retired: true, id, message: 'Removed from recall; historical triple retained for provenance.' };
   })();
 }
@@ -146,7 +146,7 @@ export function graphMemoryTool(session: string, profile?: string): ToolDefiniti
         const db = memory.db;
         const limit = input.limit ?? 3;
         if (input.action === 'status') return compact({ backend: 'mnemopi', scope: 'workspace-and-profile', embeddings: false, memoryLlm: false, automaticInjection: false,
-          counts: db.query('SELECT COUNT(*) AS total, COALESCE(SUM(retired_at IS NULL),0) AS active FROM jarvis_graph_facts').get() });
+          counts: db.query('SELECT COUNT(*) AS total, COALESCE(SUM(retired_at IS NULL),0) AS active FROM luma_graph_facts').get() });
         if (input.action === 'remember') {
           const subject = required(input.subject, 'subject');
           const predicate = required(input.predicate, 'predicate').toLowerCase();
@@ -154,7 +154,7 @@ export function graphMemoryTool(session: string, profile?: string): ToolDefiniti
           const source = required(input.source, 'source');
           const evidence = required(input.evidence, 'evidence');
           return db.transaction(() => {
-            const existing = db.query(`SELECT ${fields} FROM triples t JOIN jarvis_graph_facts f ON f.triple_id=t.id
+            const existing = db.query(`SELECT ${fields} FROM triples t JOIN luma_graph_facts f ON f.triple_id=t.id
               WHERE t.subject=? AND t.predicate=? AND f.retired_at IS NULL AND t.valid_until IS NULL`).get(subject, predicate) as { id: number; object: string } | null;
             if (existing) {
               if (existing.object === object) return compact({ saved: true, deduplicated: true, fact: existing });
@@ -168,7 +168,7 @@ export function graphMemoryTool(session: string, profile?: string): ToolDefiniti
               trustTier: 'STATED', veracity: 'stated', scope: 'bank',
               metadata: { tripleId: id, evidence, recordedAt: now, originSession: session },
             });
-            db.run('INSERT INTO jarvis_graph_facts(triple_id,memory_id,evidence,recorded_at,session_id) VALUES (?,?,?,?,?)', [id, memoryId, evidence, now, session]);
+            db.run('INSERT INTO luma_graph_facts(triple_id,memory_id,evidence,recorded_at,session_id) VALUES (?,?,?,?,?)', [id, memoryId, evidence, now, session]);
             return compact({ saved: true, id, recordedAt: now });
           })();
         }
@@ -178,7 +178,7 @@ export function graphMemoryTool(session: string, profile?: string): ToolDefiniti
         }
         if (input.action === 'relations') {
           const entity = required(input.entity, 'entity');
-          const rows = db.query(`SELECT ${fields} FROM triples t JOIN jarvis_graph_facts f ON f.triple_id=t.id
+          const rows = db.query(`SELECT ${fields} FROM triples t JOIN luma_graph_facts f ON f.triple_id=t.id
             WHERE f.retired_at IS NULL AND t.valid_until IS NULL AND (t.subject=? OR t.object=?) AND t.id>?
             ORDER BY t.id LIMIT ?`).all(entity, entity, input.after ?? 0, limit + 1) as { id: number }[];
           return compact({ facts: rows.slice(0, limit), nextAfter: rows.length > limit ? rows[limit - 1]!.id : null });
@@ -186,7 +186,7 @@ export function graphMemoryTool(session: string, profile?: string): ToolDefiniti
         if (input.action !== 'search') throw new Error('Unknown graph memory action');
         const results = await memory.recall(required(input.query, 'query'), limit);
         const facts = results.flatMap(result => {
-          const fact = db.query(`SELECT ${fields} FROM triples t JOIN jarvis_graph_facts f ON f.triple_id=t.id
+          const fact = db.query(`SELECT ${fields} FROM triples t JOIN luma_graph_facts f ON f.triple_id=t.id
             WHERE f.memory_id=? AND f.retired_at IS NULL AND t.valid_until IS NULL`).get(result.id);
           return fact ? [fact] : [];
         });

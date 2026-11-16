@@ -12,9 +12,9 @@ const call = (body: unknown) => handler(new Request('http://localhost:3000/api/m
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 }));
 beforeEach(async () => {
-  oldEnabled = process.env.JARVIS_LOCAL_MCP;
-  delete process.env.JARVIS_LOCAL_MCP;
-  base = await mkdtemp(join(tmpdir(), 'jarvis-mcp-'));
+  oldEnabled = process.env.LUMA_LOCAL_MCP;
+  delete process.env.LUMA_LOCAL_MCP;
+  base = await mkdtemp(join(tmpdir(), 'luma-mcp-'));
   const executable = join(base, 'Native MCP with spaces');
   await symlink(process.execPath, executable);
   config = { name: 'native', command: executable, args: ['-e', `
@@ -28,8 +28,8 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await call({ action: 'stop', config });
-  if (oldEnabled === undefined) delete process.env.JARVIS_LOCAL_MCP;
-  else process.env.JARVIS_LOCAL_MCP = oldEnabled;
+  if (oldEnabled === undefined) delete process.env.LUMA_LOCAL_MCP;
+  else process.env.LUMA_LOCAL_MCP = oldEnabled;
   await rm(base, { recursive: true, force: true });
 });
 
@@ -47,10 +47,10 @@ test('absolute executable paths support spaces, literal arguments and JSON-RPC i
 
 test('local execution defaults to enabled and supports explicit opt-out', async () => {
   expect(await (await call({ action: 'status' })).json()).toEqual({ enabled: true, supported: true });
-  process.env.JARVIS_LOCAL_MCP = '0';
+  process.env.LUMA_LOCAL_MCP = '0';
   expect(await (await call({ action: 'status' })).json()).toEqual({ enabled: false, supported: true });
   expect((await call({ action: 'request', config, body: { jsonrpc: '2.0', id: 1, method: 'initialize' } })).status).toBe(403);
-  delete process.env.JARVIS_LOCAL_MCP;
+  delete process.env.LUMA_LOCAL_MCP;
 });
 
 test('rejects relative paths, other bare commands, NULs and invalid arguments', async () => {

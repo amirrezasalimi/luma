@@ -22,7 +22,7 @@ interface ModuleState {
 export const agentConversationsState = {} as ModuleState;
 
 export
-// ---------------- 15b. Talk target: click a sub-agent to talk to it, click the core for Jarvis ----------------
+// ---------------- 15b. Talk target: click a sub-agent to talk to it, click the core for Luma ----------------
 function setTalk(id?: any): any {
   const a: any = id && profilesContextState.AG.get(id),
     next: any = a ? a.id : null;
@@ -219,7 +219,7 @@ export function dragPanel(n?: any): any {
   });
 }
 
-// ---------------- 15a. Jarvis awareness + orchestrator directives ----------------
+// ---------------- 15a. Luma awareness + orchestrator directives ----------------
 export function selectAgentAtPointer(e?: any): any {
     const r: any = cameraInputState.V.getBoundingClientRect(),
       k: any = cameraInputState.V.width / r.width,
@@ -232,7 +232,7 @@ export function selectAgentAtPointer(e?: any): any {
     renderAg();
     setTalk(hit.id);
     if (sceneFoundationState.mode === 'idle') tap();
-    e.jarvisAgentSelected = true;
+    e.lumaAgentSelected = true;
     return true;
 }
 export function agentTalk(t?: any, target: any = sceneFoundationState.talkTo): any {

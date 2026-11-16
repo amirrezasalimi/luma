@@ -91,8 +91,8 @@ export function peerContext(a?: any): any {
   if (!list.length) return '';
   return '\nAUTHORIZED PEER AGENTS (you may coordinate or message them via peer("Name","text")):\n' + list.map((x?: any): any => '- ' + x.name + ' (' + x.status + ', task: ' + x.task.slice(0, 60) + ', last: ' + (x.log.length ? x.log[x.log.length - 1].text.slice(0, 70) : 'none') + ')').join('\n');
 }
-// notifies main Jarvis when a sub-agent finishes or fails
-export function notifyJarvis(a?: any, ev?: any, detail?: any): any {
+// notifies main Luma when a sub-agent finishes or fails
+export function notifyLuma(a?: any, ev?: any, detail?: any): any {
   if (ev === 'COMPLETED' && a.reportSpeechEpoch === voicePipelineState.speechEpoch) return;
   if (!profilesContextState.ext.notify && a.id !== 'host' && a.id !== 'js') return;
   agentOrchestratorState.notifyQ.push({
@@ -318,7 +318,7 @@ export async function run(a?: any): Promise<any> {
       if (a.step >= profilesContextState.agentLimit(a)) {
         a.status = 'done';
         logA(a, 'step limit reached (' + profilesContextState.agentLimit(a) + ')');
-        notifyJarvis(a, 'COMPLETED', 'Reached max steps (' + profilesContextState.agentLimit(a) + '). Last status: ' + (a.log[a.log.length - 1]?.text || 'done'));
+        notifyLuma(a, 'COMPLETED', 'Reached max steps (' + profilesContextState.agentLimit(a) + '). Last status: ' + (a.log[a.log.length - 1]?.text || 'done'));
         break;
       }
       if (a.inbox.length) a.msgs.push({
@@ -402,7 +402,7 @@ export async function run(a?: any): Promise<any> {
         logA(a, a.finIdle ? 'idle, waiting for a task' : '✓ finished');
         if (!spokenStatus) agentVoice(a, say);
         agentConversationsState.ansW(a, say);
-        notifyJarvis(a, 'COMPLETED', say);
+        notifyLuma(a, 'COMPLETED', say);
         break;
       }
       const eq: any = a.errq.splice(0);
@@ -418,7 +418,7 @@ export async function run(a?: any): Promise<any> {
       a.status = 'error';
       a.lastErr = e.message || String(e);
       logA(a, '✖ ERROR: ' + a.lastErr, true);
-      notifyJarvis(a, 'FAILED', a.lastErr);
+      notifyLuma(a, 'FAILED', a.lastErr);
     }
   }
   a.running = false;

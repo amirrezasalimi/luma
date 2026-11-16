@@ -55,7 +55,7 @@ describe('Pi backend validation', () => {
 });
 
 describe('Pi execution', () => {
-  test('native Pi MCP discovers and executes a server tool without a Jarvis transport', async () => {
+  test('native Pi MCP discovers and executes a server tool without a Luma transport', async () => {
     const store = createPiMcpConfigStore(() => agentDir);
     let called = false;
     const mcp = Bun.serve({ port: 0, hostname: '127.0.0.1', async fetch(request) {
@@ -95,17 +95,17 @@ describe('Pi execution', () => {
   });
   test('Pi executes a native host call and continues with its result', async () => {
     const dir = await mkdtemp('/private/tmp/opencode/pi-loop-');
-    const previousRoot = process.env.JARVIS_CODE_ROOT;
-    const previousEnabled = process.env.JARVIS_CODE_AGENT;
-    process.env.JARVIS_CODE_ROOT = dir;
-    process.env.JARVIS_CODE_AGENT = '1';
+    const previousRoot = process.env.LUMA_CODE_ROOT;
+    const previousEnabled = process.env.LUMA_CODE_AGENT;
+    process.env.LUMA_CODE_ROOT = dir;
+    process.env.LUMA_CODE_AGENT = '1';
     let calls = 0;
     let continuation: any;
     const server = Bun.serve({ port: 0, hostname: '127.0.0.1', async fetch(request) {
       const body: any = await request.json();
       calls++;
       const chunk = (delta: unknown, finish_reason: string | null = null) => `data: ${JSON.stringify({ id: 'test', object: 'chat.completion.chunk', created: 1, model: 'test', choices: [{ index: 0, delta, finish_reason }] })}\n\n`;
-      if (calls === 1) return new Response(chunk({ role: 'assistant', tool_calls: [{ index: 0, id: 'call_read', type: 'function', function: { name: 'jarvis_host', arguments: JSON.stringify({ op: 'read', path: 'hello.txt' }) } }] }) + chunk({}, 'tool_calls') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+      if (calls === 1) return new Response(chunk({ role: 'assistant', tool_calls: [{ index: 0, id: 'call_read', type: 'function', function: { name: 'luma_host', arguments: JSON.stringify({ op: 'read', path: 'hello.txt' }) } }] }) + chunk({}, 'tool_calls') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
       continuation = body;
       return new Response(chunk({ role: 'assistant', content: 'Read successfully' }) + chunk({}, 'stop') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
     } });
@@ -120,8 +120,8 @@ describe('Pi execution', () => {
       expect(events.some(event => event.type === 'pi' && event.event.type === 'tool_execution_end' && !event.event.isError)).toBe(true);
     } finally {
       server.stop(true);
-      if (previousRoot === undefined) delete process.env.JARVIS_CODE_ROOT; else process.env.JARVIS_CODE_ROOT = previousRoot;
-      if (previousEnabled === undefined) delete process.env.JARVIS_CODE_AGENT; else process.env.JARVIS_CODE_AGENT = previousEnabled;
+      if (previousRoot === undefined) delete process.env.LUMA_CODE_ROOT; else process.env.LUMA_CODE_ROOT = previousRoot;
+      if (previousEnabled === undefined) delete process.env.LUMA_CODE_AGENT; else process.env.LUMA_CODE_AGENT = previousEnabled;
       await rm(dir, { recursive: true, force: true });
     }
   });
@@ -141,7 +141,7 @@ describe('Pi execution', () => {
       for await (const event of iterator) events.push(event);
       expect(JSON.stringify(received.messages)).toContain('Remembered');
       expect(JSON.stringify(received.messages)).toContain('Be helpful');
-      expect((received.tools || []).some((tool: any) => ['read', 'bash', 'write', 'edit', 'jarvis_host'].includes(tool.function.name))).toBe(false);
+      expect((received.tools || []).some((tool: any) => ['read', 'bash', 'write', 'edit', 'luma_host'].includes(tool.function.name))).toBe(false);
       expect(events).toContainEqual({ type: 'text', text: 'Hello from Pi' });
       expect(events).toContainEqual({ type: 'complete', text: 'Hello from Pi' });
     } finally { server.stop(true); }

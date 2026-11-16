@@ -141,17 +141,17 @@ async function configuration() {
   const agentDir = getAgentDir();
   // Pi's package manager inherits the server environment for npm subprocesses.
   // Use a dedicated cache by default, never repair ~/.npm or invoke sudo.
-  const cache = process.env.JARVIS_PI_NPM_CACHE || process.env.npm_config_cache || process.env.NPM_CONFIG_CACHE || join(agentDir, 'jarvis-npm-cache');
+  const cache = process.env.LUMA_PI_NPM_CACHE || process.env.npm_config_cache || process.env.NPM_CONFIG_CACHE || join(agentDir, 'luma-npm-cache');
   try {
     await mkdir(cache, { recursive: true, mode: 0o700 });
     await access(cache, constants.W_OK | constants.X_OK);
   } catch {
-    throw new Error(`Pi npm cache is not writable: ${cache}. Set JARVIS_PI_NPM_CACHE to a writable directory and restart Jarvis.`);
+    throw new Error(`Pi npm cache is not writable: ${cache}. Set LUMA_PI_NPM_CACHE to a writable directory and restart Luma.`);
   }
   process.env.npm_config_cache = cache;
   const settings = SettingsManager.create(process.cwd(), agentDir);
   const manager = new DefaultPackageManager({ cwd: process.cwd(), agentDir, settingsManager: settings });
-  const file = join(agentDir, 'jarvis-disabled-packages.json');
+  const file = join(agentDir, 'luma-disabled-packages.json');
   let disabled: Disabled = {};
   try { disabled = JSON.parse(await readFile(file, 'utf8')); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }

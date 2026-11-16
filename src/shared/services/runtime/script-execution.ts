@@ -9,7 +9,7 @@ import { saveSession, sessionPlain, sessionsState } from './sessions';
 import { rq } from './workspace-bridge';
 
 export
-// ---- run an async JS snippet (agent / jarvis) in the scene API; resolves {ret,er,out}
+// ---- run an async JS snippet (agent / luma) in the scene API; resolves {ret,er,out}
 async function execCode(by?: any, ag?: any, code?: any): Promise<any> {
   const action: any = hologramControlsState.undoReady ? captureUndoAction(by + ' command') : null;
   const x: any = {

@@ -62,7 +62,7 @@ export const useRuntimeUI = create<RuntimeUIState>(() => ({
   storageWarning: '',
   images: {},
   debug: { open: false, metrics: '', load: '', memory: '', agents: [] },
-  scripts: { open: false, owner: 'jarvis', rows: [], callbacks: 0, frames: 0, intervals: 0,
+  scripts: { open: false, owner: 'luma', rows: [], callbacks: 0, frames: 0, intervals: 0,
     name: '', source: '', editNode: null, status: '', saving: false },
 }));
 

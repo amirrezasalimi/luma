@@ -2,7 +2,7 @@
 import { sessionPlain } from './sessions';
 import { rq } from './workspace-bridge';
 import { mainOrchestratorState } from './main-orchestrator';
-import { logA, notifyJarvis, tell } from './agent-orchestrator';
+import { logA, notifyLuma, tell } from './agent-orchestrator';
 import { holoSet, sceneFoundationState } from './scene-foundation';
 import { getAgentProfile, profilesContextState } from './profiles-context';
 import { mkErr, scriptLifecycleState } from './script-lifecycle';
@@ -93,15 +93,15 @@ function holoApply(p?: any, wait?: any): any {
 export function rpt(by?: any, what?: any, e?: any): any {
   const er: any = mkErr('action', e, null),
     msg: any = what + ' ' + scriptLifecycleState.errTxt(er);
-  console.warn('[JARVIS]', msg);
+  console.warn('[LUMA]', msg);
   const a: any = mainOrchestratorState.findA(by);
   if (a) {
     a.errq.push(msg);
     logA(a, '✖ ' + msg, true);
     if (a.status !== 'running' && (a.fix = (a.fix || 0) + 1) <= 3) tell(a, 'ERROR: ' + msg);
-  } else if (by === 'jarvis') {
+  } else if (by === 'luma') {
     logM('✖ ' + msg, 1);
-    notifyJarvis({
+    notifyLuma({
       name: what,
       id: what,
       task: 'action'
@@ -270,12 +270,12 @@ export function agHoloSet(a?: any, p?: any, wait?: any): any {
   rq();
   return wait ? profilesContextState.sl(650).then((): any => hologramControlsState.agHoloGet(a)) : hologramControlsState.agHoloGet(a);
 }
-// target: null/'' /"me"/"self" = own agent (else main), "main"/"jarvis" = main, otherwise an agent name or id
+// target: null/'' /"me"/"self" = own agent (else main), "main"/"luma" = main, otherwise an agent name or id
 export function holoTarget(t?: any, x?: any, by?: any): any {
   if (t && typeof t === 'object' && t.id && profilesContextState.AG.has(t.id)) return profilesContextState.AG.get(t.id);
   if (t == null || t === '' || t === 'me' || t === 'self') return x.ag || mainOrchestratorState.findA(by) || null;
   const s: any = String(t).toLowerCase();
-  if (s === 'main' || s === 'luma' || s === 'jarvis') return null;
+  if (s === 'main' || s === 'luma') return null;
   const a: any = mainOrchestratorState.findA(t);
   if (!a) throw new Error('no agent "' + t + '" (hologram targets: main or an agent name)');
   return a;
@@ -430,7 +430,7 @@ export function prepareHologramControls(): void {
   hologramControlsState.actLog = (by?: any, t?: any): any => {
     if (inFrameUpdate()) return;
     const a: any = mainOrchestratorState.findA(by);
-    if (a) logA(a, '• ' + t);else if (by === 'jarvis') logM('• ' + t);
+    if (a) logA(a, '• ' + t);else if (by === 'luma') logM('• ' + t);
   };
   hologramControlsState.HLID = ['status', 'mic_level', 'mic', 'stt', 'llm'];
   hologramControlsState.hlid = 0;
@@ -575,7 +575,7 @@ export function prepareHologramControls(): void {
     };
   });
 
-  // ---------------- 12b. Mini-Jarvis hologram geometry ----------------
+  // ---------------- 12b. Mini-Luma hologram geometry ----------------
   hologramControlsState.MNR = 18;
   hologramControlsState.MNP = 18;
   hologramControlsState.mrA = [];

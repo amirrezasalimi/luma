@@ -6,7 +6,7 @@ let database: Database | undefined;
 
 export function getDatabase(): Database {
   if (database) return database;
-  const path = resolve(Bun.env.JARVIS_DATABASE || 'data/jarvis.sqlite');
+  const path = resolve(Bun.env.LUMA_DATABASE || 'data/luma.sqlite');
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   database = new Database(path, { create: true, strict: true });
   chmodSync(path, 0o600);

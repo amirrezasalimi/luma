@@ -11,7 +11,7 @@ export async function executeWorkspaceOperation(event: WorkspaceOperation, signa
   let error: string | undefined;
   try {
     if (event.session !== sessionsState.activeSession?.id || !sessionsState.sessionReady || sessionsState.sessionRestoring) throw new Error('Workspace session is no longer active or ready');
-    const api = mkApi({ by: 'jarvis', out: [], tm: new Set() });
+    const api = mkApi({ by: 'luma', out: [], tm: new Set() });
     result = sessionPlain(api.manage_agents(event.input.operation, event.input.target, event.input.options));
     logM('Agent management: ' + event.input.operation + (event.input.target ? ' ' + event.input.target : '') + ' executed');
     // The acknowledgement describes execution, not a guarantee of future agent completion.

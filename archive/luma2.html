@@ -40,7 +40,7 @@ button.p{background:var(--acc);color:#fff}
 <label>TTS model (phonon-tts)</label><input id="tts">
 <label for="voice">TTS voice</label><select id="voice"><option value="">Model default</option></select>
 <div class="r"><button class="b" id="voicesLoad" type="button">LOAD VOICES</button></div>
-<label for="voiceDemo">Demo text</label><input id="voiceDemo" value="Hello. I am Jarvis, ready when you are.">
+<label for="voiceDemo">Demo text</label><input id="voiceDemo" value="Hello. I am Luma, ready when you are.">
 <div class="r"><button class="b" id="voiceTest" type="button">TEST VOICE</button><button class="b" id="voiceStop" type="button" disabled>STOP</button></div>
 <p id="voiceStatus" role="status" style="font-size:11px;line-height:1.5">Models and the Phonon voice catalog load from local project files. No Hugging Face download is needed for the bundled model.</p>
 <label>STT engine</label><select id="sttMode"><option value="whistle">Whistle WebGPU (local)</option><option value="browser">Browser (Web Speech API)</option></select>
@@ -51,13 +51,13 @@ button.p{background:var(--acc);color:#fff}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
 <script>
 // ---------- config ----------
-const DEF={endpoint:'https://api.openai.com/v1',key:'',model:'gpt-4o-mini',sys:'You are JARVIS, a concise, witty AI assistant.',tts:'phonon-tts',voice:'',stt:'whistle-webgpu',sttMode:'browser',dev:'webgpu'};
-let cfg={...DEF};try{cfg={...DEF,...JSON.parse(localStorage.getItem('jarvis-cfg')||'{}')}}catch(e){}
+const DEF={endpoint:'https://api.openai.com/v1',key:'',model:'gpt-4o-mini',sys:'You are LUMA, a concise, witty AI assistant.',tts:'phonon-tts',voice:'',stt:'whistle-webgpu',sttMode:'browser',dev:'webgpu'};
+let cfg={...DEF};try{cfg={...DEF,...JSON.parse(localStorage.getItem('luma-cfg')||'{}')}}catch(e){}
 const $=id=>document.getElementById(id),F=['endpoint','key','model','sys','tts','voice','stt','sttMode','dev'];
 const openM=()=>{F.forEach(k=>{if(k==='voice')setVoiceOptions(cfg.voice);else $(k).value=cfg[k]});$('m').classList.add('on');refreshVoices()};
 $('gear').onclick=openM;$('x').onclick=()=>{stopVoiceDemo();$('m').classList.remove('on')};
 $('m').onclick=e=>{if(e.target.id==='m'){stopVoiceDemo();$('m').classList.remove('on')}};
-$('sv').onclick=()=>{stopVoiceDemo();F.forEach(k=>cfg[k]=$(k).value);try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}$('m').classList.remove('on')};
+$('sv').onclick=()=>{stopVoiceDemo();F.forEach(k=>cfg[k]=$(k).value);try{localStorage.setItem('luma-cfg',JSON.stringify(cfg))}catch(e){}$('m').classList.remove('on')};
 
 // ---------- palettes (hue-shifted: shadows violet, lights warm yellow) ----------
 const hx=h=>{const n=parseInt(h.slice(1),16);return 0xff000000|((n&255)<<16)|(n&0xff00)|((n>>16)&255)};
@@ -274,7 +274,7 @@ const junk=t=>t.length<2||/^[\s.,!?-]*(you|uh+|um+|hm+|mm+|ah+|oh+|thanks for wa
 const c3=h=>parseInt(h.slice(1),16),GR=['#5a1f8a','#e8541c','#ffb400','#fff1a0'].map(c3),CYr=['#1a2f8a','#1fa3d6','#44e0e8','#e4fffb'].map(c3),GH=['#1a0e3c','#3a1450','#6a2a50'].map(c3),CHz=['#0c1a4a','#0f3a6a','#1a6a8a'].map(c3);
 const mixc=(a,b,t)=>[((a>>16&255)*(1-t)+(b>>16&255)*t)|0,((a>>8&255)*(1-t)+(b>>8&255)*t)|0,((a&255)*(1-t)+(b&255)*t)|0],abgr=c=>0xff000000|(c[2]<<16)|(c[1]<<8)|c[0];
 function themeStep(){theme+=((mode==='speaking'?1:0)-theme)*.07;for(let i=0;i<4;i++)P[4+i]=abgr(mixc(GR[i],CYr[i],theme));for(let i=0;i<3;i++)HZ[i]=abgr(mixc(GH[i],CHz[i],theme));const c=mixc(0xffb400,0x44e0e8,theme);tcol=(c[0]<<16)|(c[1]<<8)|c[2]}
-function logAdd(role,text){const t=new PIXI.Text((role==='user'?'YOU':'JARVIS')+'\n'+text,{fontFamily:'ui-monospace,Menlo,Consolas,monospace',fontSize:18,lineHeight:28,fill:role==='user'?0xfff1a0:0xe4fffb,wordWrap:true,wordWrapWidth:480,breakWords:true});t.resolution=2;t.alpha=0;t.logTime=performance.now();app.stage.addChild(t);LOG.push(t)}
+function logAdd(role,text){const t=new PIXI.Text((role==='user'?'YOU':'LUMA')+'\n'+text,{fontFamily:'ui-monospace,Menlo,Consolas,monospace',fontSize:18,lineHeight:28,fill:role==='user'?0xfff1a0:0xe4fffb,wordWrap:true,wordWrapWidth:480,breakWords:true});t.resolution=2;t.alpha=0;t.logTime=performance.now();app.stage.addChild(t);LOG.push(t)}
 const mkT=()=>{const t=new PIXI.Text('',{fontFamily:'ui-monospace,Menlo,Consolas,monospace',fontSize:12,fill:0xffffff,letterSpacing:2});app.stage.addChild(t);return t},lt=k=>hTx[k]||(hTx[k]=mkT());
 // mute
 function setMute(v){muted=v;stream&&stream.getAudioTracks().forEach(t=>t.enabled=!v);if(v){stopRec();chunks=[];talking=false;vc=0;if(mode==='listening')lab.text='MIC MUTED (M)'}else if(mode==='listening'){lab.text='LISTENING...';startRec()}}
@@ -283,7 +283,7 @@ function cancelTurn(){turnId++;aborted=true;turnController?.abort();turnControll
 addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();stopVoiceDemo();cancelTurn();return}if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(e.key==='m'||e.key==='M')setMute(!muted)});
 // engine switch (settings or HUD)
 function applyEngine(){stopRec();if(mode==='listening'&&!muted&&!busy){if(cfg.sttMode==='browser')startRec();else loadW().catch(console.error)}}
-function setEngine(){cfg.sttMode=cfg.sttMode==='browser'?'whistle':'browser';try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}applyEngine()}
+function setEngine(){cfg.sttMode=cfg.sttMode==='browser'?'whistle':'browser';try{localStorage.setItem('luma-cfg',JSON.stringify(cfg))}catch(e){}applyEngine()}
 $('sv').addEventListener('click',()=>setTimeout(applyEngine,0));
 // browser STT: interim text shown live
 function startRec(){if(cfg.sttMode!=='browser'||rec||muted||busy)return;const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R){lab.text='BROWSER STT UNSUPPORTED';return}
@@ -378,7 +378,7 @@ app.ticker.add(()=>{const now=performance.now(),dt=Math.min(.05,(now-last)/1e3);
  ring.lineStyle(Math.max(2,S),tcol,.55+E*.4);ring.drawEllipse(ox,oy,R,R*.96);
  ring.lineStyle(Math.max(1,S>>1),tcol,.22);ring.drawEllipse(ox,oy,R*1.08+Math.sin(tm*2)*S*2,R*1.04)});
 </script>
-<!-- ===== JARVIS ADD-ON: paste this whole block just before </body> (after your last </script>) ===== -->
+<!-- ===== LUMA ADD-ON: paste this whole block just before </body> (after your last </script>) ===== -->
 <style>
 #pl,#pr{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));bottom:14px;display:flex;flex-direction:column;gap:8px;z-index:4;pointer-events:none;overflow-y:auto;scrollbar-width:none}
 #pl{left:14px;width:min(300px,44vw)}#pr{right:68px;width:min(270px,44vw)}
@@ -406,8 +406,8 @@ app.ticker.add(()=>{const now=performance.now(),dt=Math.min(.05,(now-last)/1e3);
 const $$=(s,r=document)=>r.querySelector(s),dpr=()=>devicePixelRatio||1,sl=ms=>new Promise(r=>setTimeout(r,ms));
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let ext={am:'',ae:'',ak:'',max:14,step:true,notify:true};
-try{ext={...ext,...JSON.parse(localStorage.getItem('jarvis-ext')||'{}')}}catch(e){}
-const saveExt=()=>{try{localStorage.setItem('jarvis-ext',JSON.stringify(ext))}catch(e){}};
+try{ext={...ext,...JSON.parse(localStorage.getItem('luma-ext')||'{}')}}catch(e){}
+const saveExt=()=>{try{localStorage.setItem('luma-ext',JSON.stringify(ext))}catch(e){}};
 const DEF={color:'#fff1a0',border:'#ffb400',fill:'#e8541c',fillA:.85,bw:2,size:1.5,fs:14};
 const KINDS=['cube','pyramid','poly','sphere','text','arrow','link'];
 const O=new Map(),PN=new Map(),AG=new Map();let oid=0,pid=0,aid=0,sel=null,linkFrom=null;
@@ -429,7 +429,7 @@ const SLOTS=[
  {x:-3.3,y:4.8,z:-2.4}, {x:3.3,y:4.8,z:-2.4}
 ];
 
-// ================= Mini-Jarvis Hologram Geometry =================
+// ================= Mini-Luma Hologram Geometry =================
 const MNR=18,MNP=18,mrA=[];
 for(let i=0;i<MNR;i++){
  const a=[Math.random()-.5,Math.random()-.5,Math.random()-.5],l=Math.hypot(...a)||1;a.forEach((_,k)=>a[k]/=l);
@@ -494,7 +494,7 @@ function act(a,by,ag){const op=String(a.op||'').toLowerCase();
  if(op==='panel_update')return updPanel(String(a.id),a)?'panel updated':'err no panel';
  if(op==='panel_delete')return delPanel(String(a.id))?'panel deleted':'err no panel';
  if(op==='tell_peer'||op==='peer'){
-  if(!ag||!ag.peers||!ag.peers.size)return'err peer communication not authorized by Jarvis';
+  if(!ag||!ag.peers||!ag.peers.size)return'err peer communication not authorized by Luma';
   const target=findA(a.to||a.agent||a.id);
   if(!target)return'err peer not found: '+(a.to||a.agent);
   if(!ag.peers.has('*')&&!ag.peers.has(target.name.toLowerCase())&&!ag.peers.has(target.id))return'err not authorized to talk to '+target.name;
@@ -582,7 +582,7 @@ function stepLogic(){const want=ext.step&&(O.size>0||PN.size>0||AG.size>0);
  else if(!want&&stepped){stepped=false;tw={z:base.z,py:base.py}}
  if(tw){cam.zoom+=(tw.z-cam.zoom)*.08;cam.py+=(tw.py-cam.py)*.08;if(Math.abs(tw.z-cam.zoom)<.003&&Math.abs(tw.py-cam.py)<.5)tw=null}}
 
-// ================= Mini-Jarvis Hologram Renderer =================
+// ================= Mini-Luma Hologram Renderer =================
 const errPal={name:'err_red',p:['#3a060c','#9e1122','#ff2a38','#ffd2d6'],hex:'#ff2a38'};
 function drawMiniHolos(){
  aused=new Set();
@@ -626,7 +626,7 @@ function drawMiniHolos(){
    if(peer){const p2=proj(peer.pos.x,peer.pos.y,peer.pos.z);ln(cen,p2,m,3.8,2,-tm*12)}
   }
 
-  // Rotating Rings (same style as main Jarvis)
+  // Rotating Rings (same style as main Luma)
   const cs=Math.cos(a.tm*.4),sn=Math.sin(a.tm*.4);
   for(let i=0;i<MNR;i++){
    const r=mrA[i],dir=r.sp<0?-1:1;let pv=null;
@@ -694,7 +694,7 @@ function objects(){stepLogic();used=new Set();const d=dpr();let L=[...O.values()
 {const _hr=window.holoRaster;window.holoRaster=function(){_hr();objects()}}
 
 // ================= Sub-Agents & Orchestrator System =================
-const AG_SYS=`You are a sub-agent of JARVIS building in a holographic 3D stage in front of the user. Work in small steps. Reply with ONE JSON object only, no markdown: {"say":"short status","actions":[...],"done":false}. Set done:true when finished.
+const AG_SYS=`You are a sub-agent of LUMA building in a holographic 3D stage in front of the user. Work in small steps. Reply with ONE JSON object only, no markdown: {"say":"short status","actions":[...],"done":false}. Set done:true when finished.
 Stage coordinates: x -6..6 (left to right), y 0..3.4 (height), z -2..2 (toward the user is +). Keep things within x -5..5 and y 0.6..2.8.
 Actions (max 12 per reply):
 {"op":"add","kind":"cube|pyramid|poly|sphere|text","id":"short_id","text":"label","x":0,"y":1.2,"z":0,"size":1.5,"color":"#fff1a0","border":"#ffb400","fill":"#e8541c","fillA":0.85,"bw":2,"fs":14,"n":6}
@@ -704,7 +704,7 @@ Actions (max 12 per reply):
 {"op":"panel","id":"..","title":"..","text":"..","side":"left|right"}  {"op":"panel_update","id":"..","text":".."}  {"op":"panel_delete","id":".."}
 {"op":"tell_peer","to":"AgentName","text":"message"}  (ONLY available if PEER AGENTS are listed in your context!)
 Style: pixel art with palette: orange #e8541c, amber #ffb400, warm yellow #fff1a0, cyan #44e0e8, blue #1fa3d6, violet #5a1f8a, emerald #2fe38a, magenta #ff3ea5.
-Rules: Leave ~2.2 units between objects. Give every object a unique short id. A MESSAGE from the user, Jarvis, or an authorized peer takes priority; if told to stop, finish with done:true.`;
+Rules: Leave ~2.2 units between objects. Give every object a unique short id. A MESSAGE from the user, Luma, or an authorized peer takes priority; if told to stop, finish with done:true.`;
 
 function logA(a,t,isErr=false){a.log.push({t:Date.now(),text:t,err:isErr});if(a.log.length>80)a.log.shift();rq()}
 const wds=t=>new Set(String(t).toLowerCase().match(/[a-z0-9]{4,}/g)||[]);
@@ -723,9 +723,9 @@ function peerContext(a){
   list.map(x=>'- '+x.name+' ('+x.status+', task: '+x.task.slice(0,60)+', last: '+(x.log.length?x.log[x.log.length-1].text.slice(0,70):'none')+')').join('\n');
 }
 
-// Notifies main Jarvis when a sub-agent finishes or fails
+// Notifies main Luma when a sub-agent finishes or fails
 const notifyQ=[];let notifyT=null;
-function notifyJarvis(a,ev,detail){
+function notifyLuma(a,ev,detail){
  if(!ext.notify)return;
  notifyQ.push({name:a.name,id:a.id,ev,task:a.task,detail});
  clearTimeout(notifyT);
@@ -788,7 +788,7 @@ async function llm(a){
 
 async function run(a){if(a.running)return;a.running=true;a.open=true;a.lastErr='';
  try{while(a.status==='running'){
-  if(a.step>=ext.max){a.status='done';logA(a,'step limit reached ('+ext.max+')');notifyJarvis(a,'COMPLETED','Reached max steps ('+ext.max+'). Last status: '+(a.log[a.log.length-1]?.text||'done'));break}
+  if(a.step>=ext.max){a.status='done';logA(a,'step limit reached ('+ext.max+')');notifyLuma(a,'COMPLETED','Reached max steps ('+ext.max+'). Last status: '+(a.log[a.log.length-1]?.text||'done'));break}
   if(a.inbox.length)a.msgs.push({role:'user',content:'MESSAGE: '+a.inbox.splice(0).join(' | ')});
   a.ctl=new AbortController();a.think=true;rq();const txt=await llm(a);a.think=false;if(a.status!=='running')break;a.step++;const j=parseJ(txt);
   if(!j){
@@ -803,14 +803,14 @@ async function run(a){if(a.running)return;a.running=true;a.open=true;a.lastErr='
    const errs=res.filter(r=>r.startsWith('err '));
    logA(a,'• '+res.join(', '),errs.length>0);
   }
-  if(j.done){a.status='done';logA(a,'✓ finished');notifyJarvis(a,'COMPLETED',j.say||'Task completed');break}
+  if(j.done){a.status='done';logA(a,'✓ finished');notifyLuma(a,'COMPLETED',j.say||'Task completed');break}
   a.msgs.push({role:'user',content:'RESULTS: '+(res.join('; ')||'none')+'\nSCENE: '+scene()+peerContext(a)});
   if(a.msgs.length>18)a.msgs.splice(1,a.msgs.length-15);await sl(350);
  }}catch(e){
   if(a.status==='running'){
    a.status='error';a.lastErr=e.message||String(e);
    logA(a,'✖ ERROR: '+a.lastErr,true);
-   notifyJarvis(a,'FAILED',a.lastErr);
+   notifyLuma(a,'FAILED',a.lastErr);
   }
  }
  a.running=false;a.think=false;
@@ -823,7 +823,7 @@ function tell(a,m){a.inbox.push(m);logA(a,'» '+m);
  if(a.status!=='running'){a.open=true;a.status='running';a.lastErr='';a.step=Math.min(a.step,ext.max-4);run(a)}rq()}
 const killA=a=>{stopA(a);killPlaneTxt('ag_'+a.id);AG.delete(a.id);rq()};
 
-// ================= Jarvis Awareness + Orchestrator Directives =================
+// ================= Luma Awareness + Orchestrator Directives =================
 const JDOC=`WORKSPACE & SUB-AGENT ORCHESTRATOR:
 You control sub-agents that appear as colored mini-holograms beside you and build 3D shapes, arrows, links and panels on the stage.
 Put directives inside double square brackets in your reply (never spoken aloud):
@@ -848,7 +848,7 @@ function directives(t){for(const m of String(t).matchAll(/\[\[\s*(\w+)\s*([^\]]*
  else if(c==='resume'&&x)tell(x,'resume');
  else if(c==='kill'){a[0]==='all'?[...AG.values()].forEach(killA):x&&killA(x)}
  else if(c==='clear')delAll();else if(c==='del')delObj(a[0]);
- else if(c==='add')addObj({kind:a[0],text:a[1],border:a[2],fill:a[2]},'jarvis');
+ else if(c==='add')addObj({kind:a[0],text:a[1],border:a[2],fill:a[2]},'luma');
 }}
 const stateTxt=()=>'Agents: '+([...AG.values()].map(a=>
  `${a.name}(id:${a.id}, color:${a.pal.name}, status:${a.status}, steps:${a.step}/${ext.max}, model:${a.model}, peers:[${[...a.peers].join(',')}], task:"${a.task.slice(0,60)}"`+
@@ -920,7 +920,7 @@ function renderAg(){const box=$$('#agl');if(!box)return;if(box.contains(document
   return'<div class="ar'+(a.status==='running'?' run':'')+'" data-id="'+a.id+'"><div class="rh" data-a="tog"><span class="dot '+a.status+'" style="background:'+(a.status==='error'?'#ff2a38':a.pal.hex)+'"></span><b style="color:'+a.pal.hex+'">'+esc(a.name)+'</b>'+peerBadge+'<i>'+esc(a.model)+' · '+a.step+'/'+ext.max+' '+(a.open?'▾':'▸')+'</i></div>'
   +'<div class="sy" data-a="tog">'+(a.think?'<span class="th">thinking…</span> ':'')+esc(last)+'</div>'
   +(a.lastErr?'<div class="err-box"><b>FAILED:</b> '+esc(a.lastErr)+'</div>':'')
-  +(a.open?'<div class="tl">'+a.tasks.map(t=>'<div>'+(t.st==='run'?'▶':t.st==='done'?'✓':'■')+' '+esc(t.text)+'</div>').join('')+'</div><pre class="lg">'+esc(a.log.slice(-16).map(l=>l.text).join('\n'))+'</pre><div class="bt">'+(a.status==='running'?'<button data-a="stop">STOP</button>':'<button data-a="run">RETRY / RESUME</button>')+'<button data-a="peer">'+(a.peers.has('*')?'ISOLATE':'SHARE PEERS')+'</button><button data-a="clr">CLEAR WORK</button><button data-a="kill">REMOVE HOLO</button></div><input data-t="'+a.id+'" placeholder="message '+esc(a.name)+' + Enter">':'')+'</div>'}).join('')||'<div class="mut">No agents yet. Ask Jarvis to build something, or launch one above.</div>'}
+  +(a.open?'<div class="tl">'+a.tasks.map(t=>'<div>'+(t.st==='run'?'▶':t.st==='done'?'✓':'■')+' '+esc(t.text)+'</div>').join('')+'</div><pre class="lg">'+esc(a.log.slice(-16).map(l=>l.text).join('\n'))+'</pre><div class="bt">'+(a.status==='running'?'<button data-a="stop">STOP</button>':'<button data-a="run">RETRY / RESUME</button>')+'<button data-a="peer">'+(a.peers.has('*')?'ISOLATE':'SHARE PEERS')+'</button><button data-a="clr">CLEAR WORK</button><button data-a="kill">REMOVE HOLO</button></div><input data-t="'+a.id+'" placeholder="message '+esc(a.name)+' + Enter">':'')+'</div>'}).join('')||'<div class="mut">No agents yet. Ask Luma to build something, or launch one above.</div>'}
 
 $$('#agl').onclick=e=>{const el=e.target.closest('[data-a]'),b=el&&el.dataset.a,a=AG.get(e.target.closest('.ar')?.dataset.id);if(!b||!a)return;
  if(b==='tog')a.open=!a.open;
@@ -952,7 +952,7 @@ V.addEventListener('pointerup',e=>{if(moved>=6)return;const r=V.getBoundingClien
  if(best){if(linkFrom&&linkFrom!==best.id){addObj({kind:'link',from:linkFrom,to:best.id},'user');msg('Linked '+linkFrom+' → '+best.id);linkFrom=null}else{sel=best.id;renderInsp();refreshUI()}}
  else if(sel){sel=null;renderInsp();refreshUI()}});
 addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||e.target.isContentEditable)return;if((e.key==='Delete'||e.key==='Backspace')&&sel){delObj(sel);sel=null;renderInsp();refreshUI()}});
-window.JARVIS={act,spawn,O,AG,PN,grantPeers};
+window.LUMA={act,spawn,O,AG,PN,grantPeers};
 })();
 </script>
 </body></html>

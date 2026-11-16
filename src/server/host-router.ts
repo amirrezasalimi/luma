@@ -16,7 +16,7 @@ import { claimSceneCommand, finishSceneCommand } from './services/scene-commands
 const procedure = os.$context<{ request: Request }>();
 const object = z.record(z.string(), z.unknown());
 function code() {
-  return createCodeAgentService({ enabled: codeAgentEnabled(), workspace: process.env.JARVIS_CODE_ROOT || process.cwd(), fullAccess: true });
+  return createCodeAgentService({ enabled: codeAgentEnabled(), workspace: process.env.LUMA_CODE_ROOT || process.cwd(), fullAccess: true });
 }
 
 
@@ -66,7 +66,7 @@ export const hostRouter = {
       .handler(async ({ input }) => (await import('./services/pi-extensions')).managePiExtension(input)),
   },
   code: {
-    status: procedure.handler(() => ({ enabled: codeAgentEnabled(), workspace: process.env.JARVIS_CODE_ROOT || process.cwd(), shellAvailable: true })),
+    status: procedure.handler(() => ({ enabled: codeAgentEnabled(), workspace: process.env.LUMA_CODE_ROOT || process.cwd(), shellAvailable: true })),
     execute: procedure.input(object).handler(({ context, input }) => code()(input, context.request.signal)),
   },
   marketplace: procedure.input(z.object({ kind: z.enum(['mcp', 'skills']), q: z.string().max(512), cursor: z.string().max(4096).optional() }))

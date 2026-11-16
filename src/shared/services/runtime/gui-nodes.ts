@@ -3,7 +3,7 @@ import * as PIXI from 'pixi.js';
 import { mkApi } from './script-api';
 import { mkErr, scriptLifecycleState } from './script-lifecycle';
 import { mainOrchestratorState } from './main-orchestrator';
-import { logA, notifyJarvis, tell } from './agent-orchestrator';
+import { logA, notifyLuma, tell } from './agent-orchestrator';
 import { hologramControlsState } from './hologram-controls';
 import { captureUndoAction, finishUndoAction } from './workspace-history';
 import { HG } from './gui-handles';
@@ -138,7 +138,7 @@ export function setGuiProps(g?: any, p?: any): any {
 export function gfail(g?: any, ev?: any, e?: any): any {
   const er: any = mkErr(ev, e, null),
     msg: any = 'gui "' + g.id + '" action ' + ev + ' ' + scriptLifecycleState.errTxt(er);
-  console.warn('[JARVIS]', msg);
+  console.warn('[LUMA]', msg);
   g.err = msg;
   g.el.style.outline = '2px solid #ff3b56';
   g.el.title = msg;
@@ -147,7 +147,7 @@ export function gfail(g?: any, ev?: any, e?: any): any {
     a.errq.push(msg);
     logA(a, '✖ ' + msg, true);
     if (a.status !== 'running' && (a.fix = (a.fix || 0) + 1) <= 3) tell(a, 'GUI ERROR: ' + msg + '. Fix it with getGui(id).set({' + ev + ':...}).');
-  } else if (g.by === 'jarvis') notifyJarvis({
+  } else if (g.by === 'luma') notifyLuma({
     name: g.id,
     id: g.id,
     task: 'gui action'

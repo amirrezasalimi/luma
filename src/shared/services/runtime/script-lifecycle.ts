@@ -1,6 +1,6 @@
 /** script-lifecycle: runtime implementation. */
 import { mainOrchestratorState } from './main-orchestrator';
-import { logA, notifyJarvis, tell } from './agent-orchestrator';
+import { logA, notifyLuma, tell } from './agent-orchestrator';
 import { profilesContextState } from './profiles-context';
 import { rq } from './workspace-bridge';
 import { mkApi, persistScriptChanges } from './script-api';
@@ -62,13 +62,13 @@ export function fail(o?: any, s?: any, phase?: any, e?: any): any {
 }
 export function report(o?: any, s?: any, er?: any): any {
   const msg: any = 'script "' + s.name + '" on node ' + o.id + ' ' + scriptLifecycleState.errTxt(er);
-  console.warn('[JARVIS]', msg);
+  console.warn('[LUMA]', msg);
   const a: any = mainOrchestratorState.findA(s.by);
   if (a) {
     a.errq.push(msg);
     logA(a, '✖ ' + msg, true);
     if (a.status !== 'running' && (a.fix = (a.fix || 0) + 1) <= 3) tell(a, 'SCRIPT ERROR: ' + msg + '. Fix it by attaching corrected source with the same script name.');
-  } else if (s.by === 'jarvis') notifyJarvis({
+  } else if (s.by === 'luma') notifyLuma({
     name: o.id,
     id: o.id,
     task: 'script ' + s.name
@@ -363,7 +363,7 @@ export function HD(o?: any, by?: any): any {
     }
   }));
 }
-// ---- the API every script / agent / jarvis snippet sees as globals
+// ---- the API every script / agent / luma snippet sees as globals
 export function prepareScriptLifecycle(): void {
   scriptLifecycleState.HK = ['mount', 'update', 'onClick', 'onHover', 'onMouseEnter', 'onMouseOut', 'onDrag', 'onDragEnd', 'unmount'];
   scriptLifecycleState.PH = scriptLifecycleState.HK.slice(2, 7);

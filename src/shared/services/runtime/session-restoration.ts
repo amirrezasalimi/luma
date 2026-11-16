@@ -206,7 +206,7 @@ export function resumeSessionScripts(): any {
   }
   for (const a of [null, ...profilesContextState.AG.values()]) for (const h of (a ? a.labels : sceneFoundationState.HLB).values()) if (h.pendingAction) {
     try {
-      const by: any = a?.name || 'jarvis',
+      const by: any = a?.name || 'luma',
         v: any = h.actionFunction ? new Function('J', 'with(J){return (' + h.actionSource + ')}')(mkApi({
           by,
           tm: new Set()

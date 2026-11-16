@@ -18,7 +18,7 @@ export const router = {
       .handler(({ input }) => forgetGraphFact(input)),
   },
   persistence: {
-    preferences: os.handler(() => getDatabase().query<{ key: string; value: string }, []>("SELECT key,value FROM preferences WHERE key NOT LIKE 'jarvis-actions-%'").all()),
+    preferences: os.handler(() => getDatabase().query<{ key: string; value: string }, []>("SELECT key,value FROM preferences WHERE key NOT LIKE 'luma-actions-%'").all()),
     preference: os.input(z.object({ key })).handler(({ input }) => {
       // Do not materialize or serialize oversized legacy undo blobs into the RPC response.
       const row = getDatabase().query<{ value: string | null; bytes: number }, [string]>(
@@ -41,7 +41,7 @@ export const router = {
       if (!row) return null;
       const document = JSON.parse(row.document);
       if (input.store === 'sessions' && document.snapshot) {
-        const visual = db.query<{ value: string }, []>("SELECT value FROM preferences WHERE key='jarvis-workspace-appearance'").get();
+        const visual = db.query<{ value: string }, []>("SELECT value FROM preferences WHERE key='luma-workspace-appearance'").get();
         if (visual) Object.assign(document.snapshot, JSON.parse(visual.value));
       }
       return document;
@@ -54,7 +54,7 @@ export const router = {
           const appearance = row.snapshot as Record<string, unknown> | undefined;
           if (appearance) {
             const shared = Object.fromEntries(['background', 'hologram', 'palettes', 'sceneDefaults'].filter(key => appearance[key] !== undefined).map(key => [key, appearance[key]]));
-            db.query("INSERT INTO preferences(key,value) VALUES ('jarvis-workspace-appearance',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(shared));
+            db.query("INSERT INTO preferences(key,value) VALUES ('luma-workspace-appearance',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(shared));
           }
           db.query('INSERT INTO sessions(id,name,updated_at,document) VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,updated_at=excluded.updated_at,document=excluded.document')
             .run(row.id, row.name, row.updatedAt || Date.now(), JSON.stringify(row));

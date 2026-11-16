@@ -1,6 +1,6 @@
 # Pi AI backend
 
-Jarvis uses `@earendil-works/pi-coding-agent` in the Bun server for main chat,
+Luma uses `@earendil-works/pi-coding-agent` in the Bun server for main chat,
 sub-agent responses, and context summaries. Configure the existing endpoint,
 API key, model, and reasoning settings as before. Endpoints must support
 OpenAI-compatible chat completions; Pi is the agent runtime, not a hosted model.
@@ -15,10 +15,10 @@ aborts the active Pi run. The handler uses oRPC's Signal Sync plugin so cancelli
 the response stream also aborts the procedure signal.
 
 Each request restores the supplied app history through an in-memory
-`SessionManager`, then disposes its Pi session. Jarvis remains responsible for
+`SessionManager`, then disposes its Pi session. Luma remains responsible for
 conversation persistence, context selection/compaction, and scene scripts.
-Pi's unrestricted default tools are disabled. With Code Agent enabled in Jarvis
-settings, Pi runs native `jarvis_host`
+Pi's unrestricted default tools are disabled. With Code Agent enabled in Luma
+settings, Pi runs native `luma_host`
 tool calls through the host service with full filesystem access under the OS
 user's permissions. Absolute paths can address files outside the workspace;
 relative paths default to the workspace. File/output size and timeout limits remain.
@@ -26,7 +26,7 @@ Pi owns the tool-call/result loop within a request; scene actions and sub-agent
 scheduling still belong to the browser. Shell access is trusted host execution,
 not an OS sandbox. Summary requests never receive tools or third-party resources.
 
-Set `JARVIS_CODE_ROOT` to select the host workspace. The client supplies its
+Set `LUMA_CODE_ROOT` to select the host workspace. The client supplies its
 configured context capacity as `context_window`; `max_tokens` optionally controls
 the output budget (default 16384, capped to the context capacity).
 
@@ -39,7 +39,7 @@ prompt templates, and themes remain disabled. Resource settings are re-read for
 each request; active requests retain their existing loadout. Interactive TUI-only
 extensions may not work in the headless server. MCP settings edit Pi's native
 `mcp.json` in the agent directory. Pi owns stdio/HTTP connections, authentication,
-tool registration, execution and cleanup; there is no Jarvis MCP transport.
+tool registration, execution and cleanup; there is no Luma MCP transport.
 Legacy SQLite MCP entries are copied once without overwriting existing Pi names;
 the original entries are retained as a backup. Changes apply to new requests.
 
@@ -67,15 +67,15 @@ This is the server user's Pi installation, not a remote browser user's machine.
 
 Disable retains the package installation but suppresses all of its resources
 in Pi settings. Original resource filters are saved in
-`jarvis-disabled-packages.json` in the Pi agent directory and restored on enable.
+`luma-disabled-packages.json` in the Pi agent directory and restored on enable.
 Package mutations are serialized within the server process. Avoid concurrent
-package edits from another Jarvis process or Pi configuration UI while applying
+package edits from another Luma process or Pi configuration UI while applying
 changes. Restart Pi or use `/reload` to load changed resources. Project-scoped
 package overrides and individually installed extension files are not managed by
-this tab. Jarvis loads enabled resources on the next conversation request.
+this tab. Luma loads enabled resources on the next conversation request.
 
-Jarvis defaults npm's cache to `<Pi agent directory>/jarvis-npm-cache`, avoiding
+Luma defaults npm's cache to `<Pi agent directory>/luma-npm-cache`, avoiding
 permission problems from root-owned files in `~/.npm` without sudo or ownership
-changes. Set `JARVIS_PI_NPM_CACHE` to override; existing `npm_config_cache` or
+changes. Set `LUMA_PI_NPM_CACHE` to override; existing `npm_config_cache` or
 `NPM_CONFIG_CACHE` is also respected. Pi inherits this via the server environment,
 so other npm subprocesses launched by the same server inherit the cache too.

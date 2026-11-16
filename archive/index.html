@@ -44,13 +44,13 @@ button.p{background:var(--acc);color:#fff}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
 <script>
 // ---------- config ----------
-const DEF={endpoint:'https://api.openai.com/v1',key:'',model:'gpt-4o-mini',sys:'You are JARVIS, a concise, witty AI assistant.',tts:'phonon-tts',voice:'jarvis-like',stt:'whistle-webgpu',dev:'webgpu'};
-let cfg={...DEF};try{cfg={...DEF,...JSON.parse(localStorage.getItem('jarvis-cfg')||'{}')}}catch(e){}
+const DEF={endpoint:'https://api.openai.com/v1',key:'',model:'gpt-4o-mini',sys:'You are LUMA, a concise, witty AI assistant.',tts:'phonon-tts',voice:'luma-like',stt:'whistle-webgpu',dev:'webgpu'};
+let cfg={...DEF};try{cfg={...DEF,...JSON.parse(localStorage.getItem('luma-cfg')||'{}')}}catch(e){}
 const $=id=>document.getElementById(id),F=['endpoint','key','model','sys','tts','voice','stt','dev'];
 const openM=()=>{F.forEach(k=>$(k).value=cfg[k]);$('m').classList.add('on')};
 $('gear').onclick=openM;$('x').onclick=()=>$('m').classList.remove('on');
 $('m').onclick=e=>{if(e.target.id==='m')$('m').classList.remove('on')};
-$('sv').onclick=()=>{F.forEach(k=>cfg[k]=$(k).value);try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}$('m').classList.remove('on')};
+$('sv').onclick=()=>{F.forEach(k=>cfg[k]=$(k).value);try{localStorage.setItem('luma-cfg',JSON.stringify(cfg))}catch(e){}$('m').classList.remove('on')};
 
 // ---------- palettes (hue-shifted: shadows violet, lights warm yellow) ----------
 const hx=h=>{const n=parseInt(h.slice(1),16);return 0xff000000|((n&255)<<16)|(n&0xff00)|((n>>16)&255)};

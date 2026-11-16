@@ -469,7 +469,7 @@ export function restoreLabels(items?: any, ag?: any): any {
       actionFunction,
       ...p
     }: any = h;
-    holoLabel('add', null, p, ag?.name || 'jarvis', ag);
+    holoLabel('add', null, p, ag?.name || 'luma', ag);
     const label: any = (ag ? ag.labels : sceneFoundationState.HLB).get(p.id);
     if (label && actionSource) {
       label.actionSource = actionSource;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { commitSettings, useSettingsStore, type JarvisConfig } from '../../../stores/settings';
+import { commitSettings, useSettingsStore, type LumaConfig } from '../../../stores/settings';
 import { useRuntimeSettings } from '../../services/settings';
 import { Action, Field, ReasoningOptions, Select, Toggle } from './controls';
 import { VoiceSettings, AgentSettings, CodeSettings } from './RuntimeTabs';
@@ -26,8 +26,8 @@ function SettingsDialogContent() {
   const services = useRuntimeSettings(state => state.services);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('main');
-  const [draft, setDraft] = useState<JarvisConfig>(() => ({ ...useSettingsStore.getState().config }));
-  const changes = useRef<Partial<JarvisConfig>>({});
+  const [draft, setDraft] = useState<LumaConfig>(() => ({ ...useSettingsStore.getState().config }));
+  const changes = useRef<Partial<LumaConfig>>({});
   const gear = useRef<HTMLButtonElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const buttons = useRef<Array<HTMLButtonElement | null>>([]);
@@ -58,7 +58,7 @@ function SettingsDialogContent() {
     if (open) card.current?.focus();
   }, [open]);
 
-  const patch = (values: Partial<JarvisConfig>) => {
+  const patch = (values: Partial<LumaConfig>) => {
     changes.current = { ...changes.current, ...values };
     setDraft(previous => ({ ...previous, ...values }));
   };

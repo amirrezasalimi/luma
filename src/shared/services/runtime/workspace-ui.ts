@@ -190,7 +190,7 @@ export function installAgentPanelHandlers(panelRoot: HTMLElement): () => void {
       const b = el?.dataset.a;
       if (!b) return;
       if (b === 'scripts') {
-        openScriptManager('jarvis');
+        openScriptManager('luma');
         return;
       }
       if (b === 'tog') hologramControlsState.MAIN.open = !hologramControlsState.MAIN.open;else if (b === 'stop') cancelTurn();else if (b === 'clr') hologramControlsState.MAIN.log.length = 0;

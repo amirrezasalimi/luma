@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 
 // SECURITY: this is host code execution, NOT a sandbox. Enabled by default;
-// set JARVIS_LOCAL_MCP=0 to disable. Accept only browser-user-confirmed configurations.
+// set LUMA_LOCAL_MCP=0 to disable. Accept only browser-user-confirmed configurations.
 // Executables, scripts and packages inherit the server user's filesystem/network
 // permissions (and environment). Never expose this handler without the RPC route's
 // loopback authority and same-origin checks. Confirmation belongs to the caller;
@@ -261,7 +261,7 @@ async function send(session: Session, body: RPC, signal: AbortSignal): Promise<S
   session.inFlight++;
   touch(session);
   const expectsResponse = typeof body.method === 'string' && Object.hasOwn(body, 'id');
-  const transportId = `jarvis:${++session.nextId}`;
+  const transportId = `luma:${++session.nextId}`;
   // Register before writing: a fast child may respond before stdin.flush resolves.
   const response = expectsResponse ? new Promise<RPC>((resolve, reject) => {
     session.pending.set(transportId, { resolve, reject });
@@ -308,7 +308,7 @@ process.once('exit', shutdownLocalMcpSessions);
 export function createLocalMcpService() {
   const sessions = new Map<string, Session>();
   return async (input: Record<string, unknown>, signal: AbortSignal): Promise<ServiceResult<Record<string, unknown>>> => {
-    const enabled = process.env.JARVIS_LOCAL_MCP !== '0';
+    const enabled = process.env.LUMA_LOCAL_MCP !== '0';
     const supported = typeof Bun !== 'undefined' && typeof Bun.spawn === 'function' && typeof Bun.which === 'function';
     try {
       if (Buffer.byteLength(JSON.stringify(input)) > REQUEST_LIMIT) throw new LocalMcpError('Request exceeds limit', 413);
@@ -317,7 +317,7 @@ export function createLocalMcpService() {
       }
       if (input.action === 'status' && input.config === undefined) return serviceResult({ enabled, supported });
       if (!enabled || !supported) {
-        throw new LocalMcpError('Local MCP execution disabled or unsupported. Requires Bun; JARVIS_LOCAL_MCP=0 disables execution. User-confirmed subprocesses run with full host-user permissions.', 403);
+        throw new LocalMcpError('Local MCP execution disabled or unsupported. Requires Bun; LUMA_LOCAL_MCP=0 disables execution. User-confirmed subprocesses run with full host-user permissions.', 403);
       }
       const config = parseConfig(input.config);
       const key = createHash('sha256').update(JSON.stringify([

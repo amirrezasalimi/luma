@@ -82,7 +82,7 @@ export function rot(g?: any, x?: any, y?: any, z?: any, o?: any): any {
 }
 export function saveHologramVisuals(): any {
   try {
-    writePreference('jarvis-hologram-visuals', JSON.stringify(rasterPrimitivesState.holoDebugVisuals));
+    writePreference('luma-hologram-visuals', JSON.stringify(rasterPrimitivesState.holoDebugVisuals));
     return true;
   } catch (e: any) {
     console.warn('Could not save hologram visuals:', e);
@@ -267,7 +267,7 @@ export function prepareRasterizer(): void {
     agentCount: [0, 16]
   };
   try {
-    const saved: any = JSON.parse(readPreference('jarvis-hologram-visuals') || '{}');
+    const saved: any = JSON.parse(readPreference('luma-hologram-visuals') || '{}');
     for (const [key, [min, max]] of Object.entries<any>(rasterPrimitivesState.holoVisualRanges)) {
       const value: any = saved?.[key];
       if (typeof value === 'number' && Number.isFinite(value)) rasterPrimitivesState.holoDebugVisuals[key] = Math.max(min, Math.min(max, ['lineWidth', 'agentCount'].includes(key) ? Math.round(value) : value));

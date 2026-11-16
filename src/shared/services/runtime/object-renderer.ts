@@ -304,7 +304,7 @@ export function killPlaneTxt(k?: any): any {
 }
 export function stepLogic(): any {/* Camera changes only through explicit user input; stage growth must not zoom it. */}
 
-// ---------------- 12g. Mini-Jarvis hologram renderer ----------------
+// ---------------- 12g. Mini-Luma hologram renderer ----------------
 export function prepareObjectRenderer(): void {
   objectRendererState.TP = new Map();
   objectRendererState.ATP = new Map();

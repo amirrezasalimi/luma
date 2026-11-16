@@ -87,8 +87,8 @@ export function connectIntegrations(): void {
   integrationsState.SK = [];
   integrationsState.MC = [];
   integrationsState.MS = new Map();
-  try { integrationsState.SK = JSON.parse(readPreference('jarvis-skills') || '[]'); } catch { /* Keep defaults. */ }
-  integrationsState.saveSK = () => writePreference('jarvis-skills', JSON.stringify(integrationsState.SK));
+  try { integrationsState.SK = JSON.parse(readPreference('luma-skills') || '[]'); } catch { /* Keep defaults. */ }
+  integrationsState.saveSK = () => writePreference('luma-skills', JSON.stringify(integrationsState.SK));
   integrationsState.saveMC = refreshMcps;
   integrationsState.skillText = name => {
     const skill = integrationsState.SK.find(value => value.on && value.name.toLowerCase() === String(name).toLowerCase());
@@ -100,19 +100,11 @@ export function connectIntegrations(): void {
     const skills = integrationsState.SK.filter(value => value.on);
     let context = skills.length ? '\nSKILLS (read with await skill("name")):\n' + skills.map(value => '- ' + value.name + ': ' + value.description).join('\n') : '';
     context += '\nMCP tools are provided natively by Pi. Use the Pi MCP tools, codemode and tool_search, not browser JavaScript mcp_call/mcp_tools.\n';
-    if (profilesContextState.ext.code && scriptApiState.codeHost?.enabled) context += '\nUse the native jarvis_host tool for host file and shell operations. Read before editing, preserve unrelated work and never perform destructive actions without user authorization. Shell commands run as the host user, not in a sandbox.\n';
+    if (profilesContextState.ext.code && scriptApiState.codeHost?.enabled) context += '\nUse the native luma_host tool for host file and shell operations. Read before editing, preserve unrelated work and never perform destructive actions without user authorization. Shell commands run as the host user, not in a sandbox.\n';
     return context;
   };
   integrationsState.jtry = tryParseJson;
-  // Copy legacy entries once, without replacing existing Pi entries or deleting the backup.
-  void (async () => {
-    if (readPreference('jarvis-mcp-pi-migrated') !== '1') {
-      const legacy = JSON.parse(readPreference('jarvis-mcp') || '[]');
-      if (legacy.length) await addMcps(legacy, true);
-      writePreference('jarvis-mcp-pi-migrated', '1');
-    }
-    await refreshMcps();
-  })().catch(error => console.error('Pi MCP configuration:', error));
+  void refreshMcps().catch(error => console.error('Pi MCP configuration:', error));
   try { holoApply(cleanAesthetics(profilesContextState.mainProfile.aesthetics, null)); }
   catch (error) { console.warn('Saved main aesthetics:', error); }
 }

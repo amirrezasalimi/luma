@@ -2,7 +2,7 @@ import { sceneExecutionFeedback } from './scene-execution-feedback';
 import { MAIN_SYSTEM_PROMPT } from '../../prompts/main';
 import { SCENE_API_PROMPT } from '../../prompts/scene-api';
 /** main-orchestrator: runtime implementation. */
-import { agentOrchestratorState, grantPeers, logA, notifyJarvis, spawn, tell } from './agent-orchestrator';
+import { agentOrchestratorState, grantPeers, logA, notifyLuma, spawn, tell } from './agent-orchestrator';
 import { getAgentProfile, profilesContextState, soulContext } from './profiles-context';
 import { hologramControlsState, logM } from './hologram-controls';
 import { captureUndoAction, finishUndoAction, workspaceHistoryState } from './workspace-history';
@@ -62,7 +62,7 @@ export function directives(t?: any): any {
       text: a[1],
       border: a[2],
       fill: a[2]
-    }, 'jarvis');
+    }, 'luma');
   }
 }
 /** Shared by module callers and the legacy window API. */
@@ -75,10 +75,10 @@ export function logMainMessage(r?: any, t?: any): any {
       if (!/^(?:js|javascript)?[ \t]*$/.test(m[1])) continue;
       const epoch = hologramControlsState.workspaceEpoch;
       const turnId = voicePipelineState.turnId;
-      execCode('jarvis', null, m[2]).then((x: any) => {
+      execCode('luma', null, m[2]).then((x: any) => {
         if (epoch !== hologramControlsState.workspaceEpoch || turnId !== voicePipelineState.turnId) return;
         const feedback = sceneExecutionFeedback(x, scriptLifecycleState.errTxt);
-        if (feedback) notifyJarvis({ name: 'jarvis-js', id: 'js', task: 'scene inspection', epoch, turnId }, feedback.event, feedback.detail);
+        if (feedback) notifyLuma({ name: 'luma-js', id: 'js', task: 'scene inspection', epoch, turnId }, feedback.event, feedback.detail);
       }).catch((error: Error) => logM(error.message, true));
     }
   }
@@ -95,6 +95,6 @@ export function connectMainOrchestrator(): void {
   mainOrchestratorState._la = logAdd;
 
   // ============================================================================
-  // 16. UI: SUB-AGENTS (top-left, Jarvis row first) & BUILD TOOLS + SCRIPT EDITOR (bottom-left)
+  // 16. UI: SUB-AGENTS (top-left, Luma row first) & BUILD TOOLS + SCRIPT EDITOR (bottom-left)
   // ============================================================================
 }

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { flushPreferences, readPreference, writePreference } from '../shared/services/persistence';
 
-export interface JarvisConfig {
+export interface LumaConfig {
   endpoint: string;
   key: string;
   model: string;
@@ -16,7 +16,7 @@ export interface JarvisConfig {
   [key: string]: unknown;
 }
 
-export const DEFAULT_CONFIG: JarvisConfig = {
+export const DEFAULT_CONFIG: LumaConfig = {
   endpoint: 'https://api.openai.com/v1',
   key: '',
   model: 'gpt-4o-mini',
@@ -29,16 +29,13 @@ export const DEFAULT_CONFIG: JarvisConfig = {
   dev: 'webgpu',
 };
 
-const STORAGE_KEY = 'jarvis-cfg';
+const STORAGE_KEY = 'luma-cfg';
 
-export function parseConfig(raw: string | null): JarvisConfig {
+export function parseConfig(raw: string | null): LumaConfig {
   try {
     const saved: unknown = JSON.parse(raw || '{}');
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return { ...DEFAULT_CONFIG };
     const config = { ...DEFAULT_CONFIG, ...saved };
-    // Migrate only the exact former app default; preserve user-authored prompts.
-    if (config.sys === 'You are JARVIS, a concise, witty AI assistant.') config.sys = DEFAULT_CONFIG.sys;
-    if (config.sys === 'Be a concise, helpful assistant. Your personal identity is defined by your saved SOUL.md, not the application name.') config.sys = DEFAULT_CONFIG.sys;
     // Old files and manual edits must not turn controlled text fields into null/objects.
     for (const key of Object.keys(DEFAULT_CONFIG)) {
       if (typeof config[key] !== 'string') config[key] = DEFAULT_CONFIG[key];
@@ -50,9 +47,9 @@ export function parseConfig(raw: string | null): JarvisConfig {
 }
 
 interface SettingsStore {
-  config: JarvisConfig;
-  setConfig: (config: JarvisConfig) => void;
-  updateConfig: (patch: Partial<JarvisConfig>) => void;
+  config: LumaConfig;
+  setConfig: (config: LumaConfig) => void;
+  updateConfig: (patch: Partial<LumaConfig>) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(immer(set => ({
@@ -69,7 +66,7 @@ export function initializeSettings() {
 }
 
 /** Save user settings without dropping runtime-owned legacy config fields. */
-export function saveSettings(config: JarvisConfig) {
+export function saveSettings(config: LumaConfig) {
   useSettingsStore.getState().setConfig(config);
   try {
     writePreference(STORAGE_KEY, JSON.stringify(config));
@@ -78,7 +75,7 @@ export function saveSettings(config: JarvisConfig) {
   }
 }
 
-export async function commitSettings(config: JarvisConfig): Promise<void> {
+export async function commitSettings(config: LumaConfig): Promise<void> {
   saveSettings(config);
   await flushPreferences();
 }

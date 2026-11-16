@@ -3,7 +3,7 @@ import { Type } from 'typebox';
 import { getDatabase } from '../database';
 
 export function readSoul(profile?: string): string {
-  const row = getDatabase().query<{ value: string }, [string]>('SELECT value FROM preferences WHERE key=?').get('jarvis-souls');
+  const row = getDatabase().query<{ value: string }, [string]>('SELECT value FROM preferences WHERE key=?').get('luma-souls');
   const souls = JSON.parse(row?.value || '{}');
   return profile ? souls.agents?.[profile.trim().toLowerCase()]?.soul || '' : souls.main || '';
 }
@@ -23,14 +23,14 @@ export function createPiSoulTool(profile: string | undefined, updated: (text: st
         if (soul.length > 32000) throw new Error('Soul limit is 32000 characters');
         const db = getDatabase();
         db.transaction(() => {
-          const row = db.query<{ value: string }, [string]>('SELECT value FROM preferences WHERE key=?').get('jarvis-souls');
+          const row = db.query<{ value: string }, [string]>('SELECT value FROM preferences WHERE key=?').get('luma-souls');
           const souls = JSON.parse(row?.value || '{"main":"","agents":{}}');
           if (profile) {
             const key = profile.trim().toLowerCase();
             souls.agents ||= {};
             Object.defineProperty(souls.agents, key, { value: { ...souls.agents[key], name: profile, soul }, enumerable: true, configurable: true });
           } else souls.main = soul;
-          db.query('INSERT INTO preferences(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run('jarvis-souls', JSON.stringify(souls));
+          db.query('INSERT INTO preferences(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run('luma-souls', JSON.stringify(souls));
         })();
         updated(soul);
       }

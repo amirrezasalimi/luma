@@ -40,7 +40,7 @@ button.p{background:var(--acc);color:#fff}
 <label>TTS model (phonon-tts)</label><input id="tts">
 <label for="voice">TTS voice</label><select id="voice"><option value="">Model default</option></select>
 <div class="r"><button class="b" id="voicesLoad" type="button">LOAD VOICES</button></div>
-<label for="voiceDemo">Demo text</label><input id="voiceDemo" value="Hello. I am Jarvis, ready when you are.">
+<label for="voiceDemo">Demo text</label><input id="voiceDemo" value="Hello. I am Luma, ready when you are.">
 <div class="r"><button class="b" id="voiceTest" type="button">TEST VOICE</button><button class="b" id="voiceStop" type="button" disabled>STOP</button></div>
 <p id="voiceStatus" role="status" style="font-size:11px;line-height:1.5">Models and the Phonon voice catalog load from local project files. No Hugging Face download is needed for the bundled model.</p>
 <label>STT engine</label><select id="sttMode"><option value="whistle">Whistle WebGPU (local)</option><option value="browser">Browser (Web Speech API)</option></select>
@@ -51,13 +51,13 @@ button.p{background:var(--acc);color:#fff}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.2/pixi.min.js"></script>
 <script>
 // ---------- config ----------
-const DEF={endpoint:'https://api.openai.com/v1',key:'',model:'gpt-4o-mini',sys:'You are JARVIS, a concise, witty AI assistant.',tts:'phonon-tts',voice:'',stt:'whistle-webgpu',sttMode:'browser',dev:'webgpu'};
-let cfg={...DEF};try{cfg={...DEF,...JSON.parse(localStorage.getItem('jarvis-cfg')||'{}')}}catch(e){}
+const DEF={endpoint:'https://api.openai.com/v1',key:'',model:'gpt-4o-mini',sys:'You are LUMA, a concise, witty AI assistant.',tts:'phonon-tts',voice:'',stt:'whistle-webgpu',sttMode:'browser',dev:'webgpu'};
+let cfg={...DEF};try{cfg={...DEF,...JSON.parse(localStorage.getItem('luma-cfg')||'{}')}}catch(e){}
 const $=id=>document.getElementById(id),F=['endpoint','key','model','sys','tts','voice','stt','sttMode','dev'];
 const openM=()=>{F.forEach(k=>{if(k==='voice')setVoiceOptions(cfg.voice);else $(k).value=cfg[k]});$('m').classList.add('on');refreshVoices()};
 $('gear').onclick=openM;$('x').onclick=()=>{stopVoiceDemo();$('m').classList.remove('on')};
 $('m').onclick=e=>{if(e.target.id==='m'){stopVoiceDemo();$('m').classList.remove('on')}};
-$('sv').onclick=()=>{stopVoiceDemo();F.forEach(k=>cfg[k]=$(k).value);try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}$('m').classList.remove('on')};
+$('sv').onclick=()=>{stopVoiceDemo();F.forEach(k=>cfg[k]=$(k).value);try{localStorage.setItem('luma-cfg',JSON.stringify(cfg))}catch(e){}$('m').classList.remove('on')};
 
 // ---------- palettes (hue-shifted: shadows violet, lights warm yellow) ----------
 const hx=h=>{const n=parseInt(h.slice(1),16);return 0xff000000|((n&255)<<16)|(n&0xff00)|((n>>16)&255)};
@@ -274,7 +274,7 @@ const junk=t=>t.length<2||/^[\s.,!?-]*(you|uh+|um+|hm+|mm+|ah+|oh+|thanks for wa
 const c3=h=>parseInt(h.slice(1),16),GR=['#5a1f8a','#e8541c','#ffb400','#fff1a0'].map(c3),CYr=['#1a2f8a','#1fa3d6','#44e0e8','#e4fffb'].map(c3),GH=['#1a0e3c','#3a1450','#6a2a50'].map(c3),CHz=['#0c1a4a','#0f3a6a','#1a6a8a'].map(c3);
 const mixc=(a,b,t)=>[((a>>16&255)*(1-t)+(b>>16&255)*t)|0,((a>>8&255)*(1-t)+(b>>8&255)*t)|0,((a&255)*(1-t)+(b&255)*t)|0],abgr=c=>0xff000000|(c[2]<<16)|(c[1]<<8)|c[0];
 function themeStep(){theme+=((mode==='speaking'?1:0)-theme)*.07;for(let i=0;i<4;i++)P[4+i]=abgr(mixc(GR[i],CYr[i],theme));for(let i=0;i<3;i++)HZ[i]=abgr(mixc(GH[i],CHz[i],theme));const c=mixc(0xffb400,0x44e0e8,theme);tcol=(c[0]<<16)|(c[1]<<8)|c[2]}
-function logAdd(role,text){const t=new PIXI.Text((role==='user'?'YOU':'JARVIS')+'\n'+text,{fontFamily:'ui-monospace,Menlo,Consolas,monospace',fontSize:18,lineHeight:28,fill:role==='user'?0xfff1a0:0xe4fffb,wordWrap:true,wordWrapWidth:480,breakWords:true});t.resolution=2;t.alpha=0;t.logTime=performance.now();app.stage.addChild(t);LOG.push(t)}
+function logAdd(role,text){const t=new PIXI.Text((role==='user'?'YOU':'LUMA')+'\n'+text,{fontFamily:'ui-monospace,Menlo,Consolas,monospace',fontSize:18,lineHeight:28,fill:role==='user'?0xfff1a0:0xe4fffb,wordWrap:true,wordWrapWidth:480,breakWords:true});t.resolution=2;t.alpha=0;t.logTime=performance.now();app.stage.addChild(t);LOG.push(t)}
 const mkT=()=>{const t=new PIXI.Text('',{fontFamily:'ui-monospace,Menlo,Consolas,monospace',fontSize:12,fill:0xffffff,letterSpacing:2});app.stage.addChild(t);return t},lt=k=>hTx[k]||(hTx[k]=mkT());
 // mute
 function setMute(v){muted=v;stream&&stream.getAudioTracks().forEach(t=>t.enabled=!v);if(v){stopRec();chunks=[];talking=false;vc=0;if(mode==='listening')lab.text='MIC MUTED (M)'}else if(mode==='listening'){lab.text='LISTENING...';startRec()}}
@@ -283,7 +283,7 @@ function cancelTurn(){turnId++;aborted=true;turnController?.abort();turnControll
 addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();stopVoiceDemo();cancelTurn();return}if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(e.key==='m'||e.key==='M')setMute(!muted)});
 // engine switch (settings or HUD)
 function applyEngine(){stopRec();if(mode==='listening'&&!muted&&!busy){if(cfg.sttMode==='browser')startRec();else loadW().catch(console.error)}}
-function setEngine(){cfg.sttMode=cfg.sttMode==='browser'?'whistle':'browser';try{localStorage.setItem('jarvis-cfg',JSON.stringify(cfg))}catch(e){}applyEngine()}
+function setEngine(){cfg.sttMode=cfg.sttMode==='browser'?'whistle':'browser';try{localStorage.setItem('luma-cfg',JSON.stringify(cfg))}catch(e){}applyEngine()}
 $('sv').addEventListener('click',()=>setTimeout(applyEngine,0));
 // browser STT: interim text shown live
 function startRec(){if(cfg.sttMode!=='browser'||rec||muted||busy)return;const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R){lab.text='BROWSER STT UNSUPPORTED';return}

@@ -38,7 +38,7 @@ function httpUrl(value: unknown): string | undefined {
 async function upstreamJson(url: URL, source: string, signal?: AbortSignal): Promise<unknown> {
   try {
     const response = await fetch(url, {
-      headers: { Accept: 'application/json', 'User-Agent': 'jarvis-marketplace' },
+      headers: { Accept: 'application/json', 'User-Agent': 'luma-marketplace' },
       redirect: 'error',
       signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT)]) : AbortSignal.timeout(TIMEOUT),
     });

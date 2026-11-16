@@ -8,8 +8,8 @@ import { validateLocalRequest } from './src/server/security';
 // Existing handler/security assertions do not depend on the deleted standalone host.
 function createServerHandler(options: { port?: number; codeEnabled?: boolean; codeRoot?: string } = {}) {
   const handler = createCodeAgentHandler({
-    enabled: options.codeEnabled ?? Bun.env.JARVIS_CODE_AGENT === '1',
-    workspace: options.codeRoot ?? Bun.env.JARVIS_CODE_ROOT ?? import.meta.dir,
+    enabled: options.codeEnabled ?? Bun.env.LUMA_CODE_AGENT === '1',
+    workspace: options.codeRoot ?? Bun.env.LUMA_CODE_ROOT ?? import.meta.dir,
   });
   return async (request: Request) => validateLocalRequest(request, options.port ?? 3000) ?? handler(request);
 }
@@ -17,7 +17,7 @@ function createServerHandler(options: { port?: number; codeEnabled?: boolean; co
 let base: string, workspace: string;
 let handler: ReturnType<typeof createCodeAgentHandler>;
 beforeEach(async () => {
-  base = await mkdtemp(join(tmpdir(), 'jarvis-code-'));
+  base = await mkdtemp(join(tmpdir(), 'luma-code-'));
   workspace = join(base, 'workspace');
   await mkdir(workspace);
   handler = createCodeAgentHandler({ enabled: true, workspace });
@@ -216,21 +216,21 @@ describe('server security and disabled status', () => {
     expect(await disabled.json()).toMatchObject({ error: { code: 'DISABLED' } });
   });
   test('environment gate requires exactly 1 and uses the configured workspace', async () => {
-    const previousEnabled = Bun.env.JARVIS_CODE_AGENT, previousRoot = Bun.env.JARVIS_CODE_ROOT;
+    const previousEnabled = Bun.env.LUMA_CODE_AGENT, previousRoot = Bun.env.LUMA_CODE_ROOT;
     try {
-      Bun.env.JARVIS_CODE_ROOT = workspace;
+      Bun.env.LUMA_CODE_ROOT = workspace;
       for (const value of ['0', 'true', '1']) {
-        Bun.env.JARVIS_CODE_AGENT = value;
+        Bun.env.LUMA_CODE_AGENT = value;
         const server = createServerHandler({ port: 3000 });
         const response = await server(new Request('http://localhost:3000/api/code', { headers: { host: 'localhost:3000' } }));
         expect(await response.json()).toEqual({ enabled: value === '1', workspace, shellAvailable: true });
         expect((await server(request({ op: 'write', path: 'env-test', content: 'ok' }))).status).toBe(value === '1' ? 200 : 403);
       }
     } finally {
-      if (previousEnabled === undefined) delete Bun.env.JARVIS_CODE_AGENT;
-      else Bun.env.JARVIS_CODE_AGENT = previousEnabled;
-      if (previousRoot === undefined) delete Bun.env.JARVIS_CODE_ROOT;
-      else Bun.env.JARVIS_CODE_ROOT = previousRoot;
+      if (previousEnabled === undefined) delete Bun.env.LUMA_CODE_AGENT;
+      else Bun.env.LUMA_CODE_AGENT = previousEnabled;
+      if (previousRoot === undefined) delete Bun.env.LUMA_CODE_ROOT;
+      else Bun.env.LUMA_CODE_ROOT = previousRoot;
     }
   });
   test('only exact loopback hosts and configured ports, with same-origin checks', async () => {

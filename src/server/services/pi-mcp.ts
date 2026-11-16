@@ -47,7 +47,7 @@ export function createPiMcpConfigStore(agentDir: () => string | Promise<string> 
           servers[input.name] = { ...servers[input.name], enabled: input.enabled };
         }
         await mkdir(await agentDir(), { recursive: true });
-        const temporary = `${path}.jarvis-${crypto.randomUUID()}.tmp`;
+        const temporary = `${path}.luma-${crypto.randomUUID()}.tmp`;
         await writeFile(temporary, JSON.stringify({ ...document, mcpServers: servers }, null, 2) + '\n', { mode: 0o600 });
         await rename(temporary, path);
         return { path, servers };

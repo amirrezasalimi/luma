@@ -81,7 +81,7 @@ export function drawMiniHolos(): any {
         r: any = sc * 1.15;
       ln(proj(hx + Math.cos(angle) * r, hy + Math.sin(angle) * r, hz), proj(hx + Math.cos(angle) * (r + level * sc * .9), hy + Math.sin(angle) * (r + level * sc * .9), hz), m, 2 + level * 2, 1);
     }
-    // rotating rings (same style as main Jarvis)
+    // rotating rings (same style as main Luma)
     const cs: any = Math.cos(a.tm * .4),
       sn: any = Math.sin(a.tm * .4);
     for (let i: any = 0; i < Math.round(hologramControlsState.MNR * visual.lineDensity * rasterPrimitivesState.holoDebugVisuals.lineDensity); i++) {

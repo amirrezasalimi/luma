@@ -56,7 +56,7 @@ export function connectSettings(): void {
           threshold: profilesContextState.num(value.threshold, 10, 95, 75),
           lastN: Math.round(profilesContextState.num(value.lastN, 2, 200, 16))
         };
-        writePreference('jarvis-context', JSON.stringify(profilesContextState.contextConfig));
+        writePreference('luma-context', JSON.stringify(profilesContextState.contextConfig));
         settingsChanged();
       },
       updateMain: (patch?: any): any => {

@@ -1,6 +1,6 @@
 # Local speech models
 
-Serve this directory over HTTP on localhost (not `file://`) and open `jarvis.html`.
+Run `bun install` and `bun run dev`, then open `http://localhost:3000` (not `file://`).
 The default `phonon-tts` setting uses local Phonon 31m English weights and a vendored
 Phonon runtime. The voice selector reads the local catalog and local voice files.
 Whistle always uses `whistle/worker.js` and its adjacent weights; `?local` is no longer needed.
@@ -32,4 +32,4 @@ consult upstream licenses before redistributing voice assets.
 The browser still reads weights from the local server when initializing a model;
 this is not a fresh internet download. Phonon also retains its browser cache.
 Existing browser settings are preserved; choose a valid voice in Settings if an
-old saved voice such as `jarvis-like` is no longer available.
+old saved voice such as `luma-like` is no longer available.

@@ -197,7 +197,7 @@ export function prepareWorkspaceHistory(): void {
   workspaceHistoryState.undoActions = [];
   workspaceHistoryState.redoActions = [];
   workspaceHistoryState.undoApplying = false;
-  workspaceHistoryState.undoStorageKey = (): any => 'jarvis-actions-' + sessionsState.activeSession.id;
+  workspaceHistoryState.undoStorageKey = (): any => 'luma-actions-' + sessionsState.activeSession.id;
   workspaceHistoryState.undoWorkspace = (): any => applyWorkspaceHistory(false);
   workspaceHistoryState.redoWorkspace = (): any => applyWorkspaceHistory(true);
   window.addEventListener('keydown', event => {

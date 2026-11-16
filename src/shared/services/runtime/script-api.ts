@@ -9,7 +9,7 @@ import { HD, attach, build, detach, exp, fail, scriptLifecycleState, unmountS } 
 import { holoApply, holoH, hologramControlsState, logM, resetHologramSetting, wrapLog } from './hologram-controls';
 import { sceneFoundationState } from './scene-foundation';
 import { mainOrchestratorState } from './main-orchestrator';
-import { agentOrchestratorState, grantPeers, logA, notifyJarvis, spawn, tell } from './agent-orchestrator';
+import { agentOrchestratorState, grantPeers, logA, notifyLuma, spawn, tell } from './agent-orchestrator';
 import { addGui, delGui, guiNodesState, setStageBackground } from './gui-nodes';
 import { act, scene, dumpObject } from './scene-actions';
 import { HG, guiNodes2State } from './gui-handles';
@@ -121,22 +121,22 @@ export async function codeCall(op?: any, args: any = {}, ag: any = null): Promis
   const controller: any = new AbortController();
   scriptApiState.codeRequests.add(controller);
   const signal: any = ag?.ctl ? AbortSignal.any([controller.signal, ag.ctl.signal]) : controller.signal;
-  const who: any = ag ? ag.name : 'jarvis',
+  const who: any = ag ? ag.name : 'luma',
     label: any = 'host ' + op + ' ' + String(args.path || args.command || '.').slice(0, 100);
   if (ag) logA(ag, label);else logM(label);
   try {
     const r = await host.codeExecute({ ...args, op }, signal);
     const result = r.data;
     if (r.status >= 400) throw new Error(('error' in result && result.error?.message) || 'Host tool failed: ' + r.status);
-    if (!ag) notifyJarvis({
-      name: 'jarvis-host',
+    if (!ag) notifyLuma({
+      name: 'luma-host',
       id: 'host',
       task: label
     }, 'RESULT', JSON.stringify(result).slice(0, 16000));
     return result;
   } catch (e: any) {
-    if (!ag) notifyJarvis({
-      name: 'jarvis-host',
+    if (!ag) notifyLuma({
+      name: 'luma-host',
       id: 'host',
       task: label
     }, 'FAILED', e.message);
@@ -367,7 +367,7 @@ export function mkApi(x?: any): any {
       const t: any = a.map((v?: any): any => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(' ');
       if (x.out) x.out.push(t);
       const ag: any = x.ag || mainOrchestratorState.findA(by);
-      if (ag) logA(ag, '› ' + t.slice(0, 160));else if (by === 'jarvis') logM('› ' + t.slice(0, 160));
+      if (ag) logA(ag, '› ' + t.slice(0, 160));else if (by === 'luma') logM('› ' + t.slice(0, 160));
     },
     scene,
     dump: (id?: any): any => id ? dumpObject(profilesContextState.O.get(String(id))) : [...profilesContextState.O.values()].map(dumpObject),
@@ -476,7 +476,7 @@ export function mkApi(x?: any): any {
     }),
     switch_agent: (target?: any): any => {
       const name: any = String(target?.id ?? target ?? 'main').trim(),
-        main: any = /^(main|jarvis)$/i.test(name),
+        main: any = /^(main|luma)$/i.test(name),
         a: any = main ? null : mainOrchestratorState.findA(name);
       if (!main && !a) throw new Error('No agent ' + name);
       setTalk(a?.id || null);
@@ -594,7 +594,7 @@ export function mkApi(x?: any): any {
     },
     ask_main_agent: (t?: any): any => askMain(t, by),
     manage_agents: (operation: string, target?: string, options: any = {}): any => {
-      if (x.ag || by !== 'jarvis') throw new Error('Agent management is reserved for the main orchestrator');
+      if (x.ag || by !== 'luma') throw new Error('Agent management is reserved for the main orchestrator');
       const inspect = (a: any): any => ({
         ...hologramControlsState.agInfo(a), task: a.task, step: a.step, lastError: a.lastErr,
         peers: [...a.peers], pendingMessages: [...a.inbox],
@@ -659,10 +659,10 @@ export function mkApi(x?: any): any {
   }
   return wrapLog(J, by);
 }
-// ---- run an async JS snippet (agent / jarvis) in the scene API; resolves {ret,er,out}
+// ---- run an async JS snippet (agent / luma) in the scene API; resolves {ret,er,out}
 export function createScriptApi(): void {
   scriptApiState.JT = new Set();
-  scriptApiState.scriptManagerOwner = 'jarvis';
+  scriptApiState.scriptManagerOwner = 'luma';
   scriptApiState.codeHost = null;
   scriptApiState.codeRequests = new Set();
 }

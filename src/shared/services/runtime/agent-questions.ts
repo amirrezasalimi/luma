@@ -1,6 +1,6 @@
 /** agent-questions: runtime implementation. */
 import { hologramControlsState } from './hologram-controls';
-import { notifyJarvis } from './agent-orchestrator';
+import { notifyLuma } from './agent-orchestrator';
 import { addMcps, addSkills, integrationsState, parseSkill, renderSk } from './integrations';
 
 interface ModuleState {
@@ -74,7 +74,7 @@ export function askUser(options?: any, agent: any = null): any {
         agentQuestionsState.pendingQuestions.splice(i, 1);
         card.remove();
         resolve(answer);
-        if (!agent && epoch === hologramControlsState.workspaceEpoch && !answer.cancelled) notifyJarvis({
+        if (!agent && epoch === hologramControlsState.workspaceEpoch && !answer.cancelled) notifyLuma({
           name: 'user-answer',
           id: 'host',
           task: text.textContent
