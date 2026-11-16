@@ -6,8 +6,7 @@
     "dev": "bun --bun vite",
     "build": "bun --bun vite build && bun scripts/copy-assets.ts",
     "start": "bun src/server/production.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test ./code-agent.test.ts ./local-mcp.test.ts ./pi-backend.test.ts ./pi-extensions.test.ts --timeout 10000"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^1.5.2",
