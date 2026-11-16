@@ -40,7 +40,7 @@ bun run dev
 
 Open **http://localhost:3000**, configure your endpoint, API key, and model in **Settings**, then tap the sphere and allow microphone access.
 
-Speech models are bundled, so the download is substantial. See [local model details](LOCAL_MODELS.md) for setup and recovery notes.
+Speech models are bundled, so the download is substantial.
 
 ## Controls
 

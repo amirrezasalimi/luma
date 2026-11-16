@@ -3,6 +3,8 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import react from '@vitejs/plugin-react';
 import { serveAsset } from './src/server/assets.ts';
 import { Readable } from 'node:stream';
+import { cp, mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
@@ -44,6 +46,18 @@ export default defineConfig({
     react(),
     {
       name: 'luma-local-assets',
+      async closeBundle() {
+        if (this.environment.name !== 'client') return;
+        const out = resolve('dist/client');
+        await mkdir(out, { recursive: true });
+        for (const name of ['models', 'vendor', 'whistle']) {
+          await cp(resolve(name), resolve(out, name), {
+            recursive: true,
+            filter: path => !path.split('/').some(part =>
+              ['.cache', '__pycache__', '.gitattributes', '.DS_Store'].includes(part)),
+          });
+        }
+      },
       configureServer(server) {
         server.middlewares.use(async (req, res, next) => {
           try {

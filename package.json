@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --bun vite",
-    "build": "bun --bun vite build && bun scripts/copy-assets.ts",
+    "build": "bun --bun vite build",
     "start": "bun src/server/production.ts",
     "typecheck": "tsc --noEmit"
   },
