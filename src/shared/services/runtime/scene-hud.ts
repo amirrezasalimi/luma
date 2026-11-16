@@ -30,7 +30,7 @@ export function themeStep(): any {
 }
 export function logAdd(role?: any, text?: any): any {
   checkpointFloorMessage(role, text);
-  const t: any = new PIXI.Text((role === 'user' ? 'YOU' : 'JARVIS') + '\n' + text, {
+  const t: any = new PIXI.Text((role === 'user' ? 'YOU' : 'LUMA') + '\n' + text, {
     fontFamily: 'ui-monospace,Menlo,Consolas,monospace',
     fontSize: 18,
     lineHeight: 28,
@@ -113,6 +113,27 @@ export function hud(): any {
   const d: any = devicePixelRatio || 1,
     cd: any = proj(sceneFoundationState.HX, sceneFoundationState.HY, sceneFoundationState.HQ)[2];
   sceneHudState.hgx.clear();
+  // Keep microphone state beside the status even while the status changes to thinking/speaking.
+  const status = sceneFoundationState.lab;
+  const iconScale = devicePixelRatio || 1;
+  const iconX = status.x - status.width / 2 - 18 * iconScale;
+  const iconY = status.y;
+  const mic = sceneHudState.hgx;
+  mic.lineStyle(1.5 * iconScale, voicePipelineState.muted ? 0xff657a : voicePipelineState.tcol, 1);
+  mic.drawRoundedRect(iconX - 3 * iconScale, iconY - 8 * iconScale, 6 * iconScale, 10 * iconScale, 3 * iconScale);
+  mic.moveTo(iconX - 6 * iconScale, iconY - 2 * iconScale);
+  mic.lineTo(iconX - 6 * iconScale, iconY + iconScale);
+  mic.quadraticCurveTo(iconX - 6 * iconScale, iconY + 6 * iconScale, iconX, iconY + 6 * iconScale);
+  mic.quadraticCurveTo(iconX + 6 * iconScale, iconY + 6 * iconScale, iconX + 6 * iconScale, iconY + iconScale);
+  mic.lineTo(iconX + 6 * iconScale, iconY - 2 * iconScale);
+  mic.moveTo(iconX, iconY + 6 * iconScale);
+  mic.lineTo(iconX, iconY + 9 * iconScale);
+  mic.moveTo(iconX - 4 * iconScale, iconY + 9 * iconScale);
+  mic.lineTo(iconX + 4 * iconScale, iconY + 9 * iconScale);
+  if (voicePipelineState.muted) {
+    mic.moveTo(iconX - 9 * iconScale, iconY - 9 * iconScale);
+    mic.lineTo(iconX + 9 * iconScale, iconY + 10 * iconScale);
+  }
   voicePipelineState.btns.length = 0;
   sceneFoundationState.lab.tint = voicePipelineState.tcol;
   let k: any = 0;

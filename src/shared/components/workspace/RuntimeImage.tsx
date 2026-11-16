@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useState } from 'react';
+import { Modal } from '../Modal';
 import { createRoot } from 'react-dom/client';
 import { useRuntimeUI, type RuntimeImage as ImageState } from '../../../stores/runtime-ui';
 
@@ -26,31 +26,14 @@ function ImageContent({ image, modal = false, step, open }: { image: ImageState;
 }
 
 function ImageDialog({ id, image, step, close }: { id: string; image: ImageState; step: (delta: number) => void; close: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const focus = document.activeElement;
-    const element = dialog.current;
-    element?.showModal();
-    return () => {
-      element?.close();
-      if (focus instanceof HTMLElement && focus.isConnected) focus.focus({ preventScroll: true });
-    };
-  }, []);
-  return createPortal(<dialog ref={dialog} className="gimage-lightbox" aria-labelledby={`gimage-title-${id}`} aria-modal="true"
-    onCancel={event => { event.preventDefault(); close(); }} onClose={close}
-    onClick={event => {
-      event.stopPropagation();
-      if (event.target !== event.currentTarget) return;
-      const r = event.currentTarget.getBoundingClientRect();
-      if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close();
-    }} onKeyDown={event => {
+  return <Modal className="gimage-lightbox" aria-labelledby={`gimage-title-${id}`} onClose={close} onKeyDown={event => {
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault(); event.stopPropagation(); step(event.key === 'ArrowLeft' ? -1 : 1);
       }
     }}>
     <h2 id={`gimage-title-${id}`}>Image viewer</h2><button type="button" aria-label="Close image lightbox" autoFocus onClick={close}>Close</button>
     <ImageContent key={image.url} image={image} modal step={step} open={() => {}} />
-  </dialog>, document.body);
+  </Modal>;
 }
 
 function RuntimeImage({ id, step, open, close }: { id: string; step: (delta: number) => void; open: () => void; close: () => void }) {

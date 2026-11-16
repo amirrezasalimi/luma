@@ -24,10 +24,10 @@ function Jarvis() {
       initializeSettings();
       await startJarvis();
     }).catch((cause) => {
-      console.error('JARVIS startup failed:', cause);
+      console.error('Luma startup failed:', cause);
       setError(String(cause));
     });
   }, []);
 
-  return <><WorkspaceHosts /><SettingsDialog /><NewSessionDialog /><PersistenceStatus /><RuntimeOverlays /><ScriptManager /><DiagnosticsPanel />{error && <p role="alert">JARVIS startup failed: {error}</p>}</>;
+  return <><WorkspaceHosts /><SettingsDialog /><NewSessionDialog /><PersistenceStatus /><RuntimeOverlays /><ScriptManager /><DiagnosticsPanel />{error && <p role="alert">Luma startup failed: {error}</p>}</>;
 }

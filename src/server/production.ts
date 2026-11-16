@@ -10,4 +10,4 @@ Bun.serve({
     return await serveAsset(request, resolve(process.cwd(), 'dist/client')) ?? start.fetch(request);
   },
 });
-console.log(`JARVIS: http://localhost:${port}`);
+console.log(`Luma: http://localhost:${port}`);

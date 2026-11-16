@@ -6,12 +6,40 @@ import { Readable } from 'node:stream';
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
+  // Mnemopi ships Bun-native TypeScript and text imports, not browser code.
+  // Keep its dependency tree out of Rolldown's browser prebundler and let
+  // Bun resolve it at runtime on the server.
+  optimizeDeps: {
+    exclude: ['@oh-my-pi/pi-mnemopi', '@oh-my-pi/pi-ai', '@oh-my-pi/pi-utils', '@oh-my-pi/pi-catalog', '@oh-my-pi/pi-natives'],
+  },
+  ssr: {
+    external: ['@oh-my-pi/pi-mnemopi', '@oh-my-pi/pi-ai', '@oh-my-pi/pi-utils', '@oh-my-pi/pi-catalog', '@oh-my-pi/pi-natives'],
+  },
+  environments: {
+    ssr: {
+      resolve: {
+        // fetchModule checks builtins before transforming source packages.
+        builtins: [/^node:/, /^bun:/, /^@oh-my-pi\//],
+      },
+    },
+  },
   server: {
     host: '127.0.0.1',
     port: Number(process.env.PORT || 3000),
     strictPort: true,
   },
   plugins: [
+    {
+      name: 'jarvis-bun-memory-externals',
+      enforce: 'pre',
+      resolveId(source, _importer, options) {
+        // TanStack's SSR bundling can override ssr.external for source
+        // packages. Preserve all OMP entry points, including subpaths.
+        if (options.ssr && source.startsWith('@oh-my-pi/')) {
+          return { id: source, external: true };
+        }
+      },
+    },
     tanstackStart({ spa: { enabled: true, prerender: { outputPath: '/index.html' } } }),
     react(),
     {

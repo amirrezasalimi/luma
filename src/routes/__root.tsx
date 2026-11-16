@@ -6,7 +6,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
-      { title: 'J.A.R.V.I.S. Hologram' },
+      { title: 'Luma' },
     ],
     links: [{ rel: 'stylesheet', href: styles }],
   }),

@@ -103,7 +103,7 @@ export function PiExtensionsSettings() {
       setResult(previous => previous ? { ...previous, rows: previous.rows.map(row => row.source === source ? { ...row, installed: response.installed } : row) } : previous);
       const text = action === 'install' ? 'Installed successfully' : action === 'uninstall' ? 'Uninstalled successfully' : action === 'enable' ? 'Enabled successfully' : 'Disabled successfully';
       setCardNotice({ source, text, error: false });
-      setStatus(`${text}. Jarvis loads enabled resources on the next conversation request. Standalone Pi requires /reload or restart.`);
+      setStatus(`${text}. Luma loads enabled resources on the next conversation request. Standalone Pi requires /reload or restart.`);
     } catch (error) {
       setCardNotice({ source, text: String(error), error: true });
       setStatus('Package update failed. Reopen this tab to recheck installation status.');

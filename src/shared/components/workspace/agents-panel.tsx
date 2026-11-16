@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { installAgentPanelHandlers } from '../../services/runtime/workspace-ui';
+import { MemoryGraphButton } from './memory-graph';
 
 /** React owns the workspace panel shell and agent-launch form. */
 export function AgentsPanel() {
@@ -10,8 +11,9 @@ export function AgentsPanel() {
     return installAgentPanelHandlers(root);
   }, []);
   return <section className={`pn t${collapsed ? ' c' : ''}`} id="workspace-agents-panel">
-    <h4 onClick={() => setCollapsed(value => !value)}><span>JARVIS + SUB-AGENTS <b id="agn">0</b></span><span>▾</span></h4>
+    <h4 onClick={() => setCollapsed(value => !value)}><span>LUMA + SUB-AGENTS <b id="agn">0</b></span><span>▾</span></h4>
     <div className="bd">
+      <MemoryGraphButton />
       <details id="agnew"><summary>+ NEW AGENT</summary>
         <input id="an" placeholder="name (optional)" />
         <textarea id="at" rows={2} placeholder="task, e.g. draw a 3 tier web architecture with arrows" />

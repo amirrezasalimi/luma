@@ -68,6 +68,8 @@ canvas#v {
   color: #fff;
   box-shadow: 4px 4px 0 var(--fg);
 }
+.settings-modal-base{border:0;padding:0;margin:0;width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;background:transparent;color:inherit;overflow:hidden}
+.settings-modal-base::backdrop{background:transparent}
 #m {
   position: fixed;
   inset: 0;

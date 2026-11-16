@@ -1,5 +1,7 @@
 /** scene-foundation: runtime implementation. */
-import * as PIXI from 'pixi.js';
+// Registers Canvas renderers for Graphics/Text/Sprite as a fallback when WebGL
+// is unavailable (disabled GPU, blocked contexts, or unsupported devices).
+import * as PIXI from 'pixi.js-legacy';
 import { useSettingsStore } from "../../../stores/settings";
 import { sceneHudState } from './scene-hud';
 

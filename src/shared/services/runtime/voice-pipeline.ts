@@ -1,5 +1,6 @@
 /** voice-pipeline: runtime implementation. */
 import { rpc } from '../rpc';
+import { cancelBackendRun, durableChat } from './backend-runs';
 import { useRuntimeSettings } from '../settings';
 import { checkpointConversation } from './workspace-history';
 import { logMainMessage, mainSystemPrompt } from './main-orchestrator';
@@ -267,28 +268,35 @@ export async function ask(text?: any, id: any = voicePipelineState.turnId): Prom
   try {
     const messages = [{ role: 'system', content: mainSystemPrompt() }, ...await prepareMainMessages(voicePipelineState.hist)];
     hologramControlsState.MAIN.debugRequest = { at: Date.now(), model: sceneFoundationState.cfg.model, messages, estimatedTokens: profilesContextState.estimateTokens(messages) };
-    const events = await rpc.host.ai.chat({
+    const events = durableChat({
         endpoint: sceneFoundationState.cfg.endpoint,
         apiKey: sceneFoundationState.cfg.key,
         model: sceneFoundationState.cfg.model,
+        session_id: sessionsState.activeSession?.id,
         host_tools: !!profilesContextState.ext.code,
         context_window: Number(profilesContextState.contextConfig.maxTokens) || 128000,
         ...(sceneFoundationState.cfg.reasoningEffort ? {
           reasoning_effort: sceneFoundationState.cfg.reasoningEffort
         } : {}),
         messages,
-    }, { signal });
+    }, signal);
     let completed = false;
     for await (const event of events) {
       check();
-      if (event.type === 'text') {
+      if (event.type === 'workspace_operation') {
+        const { executeWorkspaceOperation } = await import('./workspace-operations');
+        await executeWorkspaceOperation(event, signal, check);
+      } else if (event.type === 'text') {
         full += event.text;
         enqueue(event.text);
       } else if (event.type === 'pi') {
         const info = event.event;
         if (info.type === 'soul_updated') updateSoul(null, info.text);
-        if (info.type === 'tool_execution_start') logM('⚙ Pi: ' + info.toolName);
-        if (info.type === 'tool_execution_end') logM('Pi: ' + info.toolName + (info.isError ? ' failed' : ' completed'), !!info.isError);
+        if (info.type === 'tool_execution_start' || info.type === 'tool_execution_end') {
+          logM('Pi: ' + info.toolName + (info.type === 'tool_execution_start' ? ' started' : info.isError ? ' failed' : ' completed'), info.type === 'tool_execution_end' && !!info.isError);
+          const entry = hologramControlsState.MAIN.log.at(-1);
+          if (entry && info.recordId) entry.toolRecord = { id: info.recordId, session: sessionsState.activeSession?.id };
+        }
         if (info.type === 'extension_error') logM(info.message, true);
       } else if (event.type === 'complete') {
         full = event.text;
@@ -494,7 +502,8 @@ export function setMute(v?: any): any {
     startRec();
   }
 }
-export function cancelTurn(): any {
+export function cancelTurn(cancelBackend = true): any {
+  if (cancelBackend) cancelBackendRun();
   voicePipelineState.turnId++;
   voicePipelineState.speechEpoch++;
   voicePipelineState.speechController?.abort();
@@ -698,6 +707,8 @@ export function connectVoicePipeline(): void {
   voicePipelineState.speechEpoch = 0;
   voicePipelineState.speechController = null;
   addEventListener('keydown', (e?: any): any => {
+    // Modal keyboard handling takes precedence over workspace/voice shortcuts.
+    if (e.defaultPrevented || document.querySelector('dialog[open]') || e.composedPath().some((node: any) => node instanceof Element && node.matches('[role="dialog"]'))) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       stopVoiceDemo();
@@ -740,3 +751,4 @@ export function connectVoicePipeline(): void {
   voicePipelineState.speechTargetActive = (agent?: any): any => agent ? sceneFoundationState.talkTo === agent.id || agent.reportSpeechEpoch === voicePipelineState.speechEpoch : !sceneFoundationState.talkTo;
   preloadTTS();
 }
+import { sessionsState } from './sessions';

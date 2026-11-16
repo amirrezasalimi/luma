@@ -1,13 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { Modal } from '../Modal';
 import { updateScriptUI, useRuntimeUI, type ScriptRow } from '../../../stores/runtime-ui';
 
 export function ScriptManager() {
   const state = useRuntimeUI(s => s.scripts);
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (state.open && !dialog.current?.open) dialog.current?.showModal();
-    else if (!state.open && dialog.current?.open) dialog.current.close();
-  }, [state.open]);
 
   const action = async (run: (api: typeof import('../../services/runtime/script-api')) => unknown) => {
     try { await run(await import('../../services/runtime/script-api')); }
@@ -20,7 +15,7 @@ export function ScriptManager() {
       api.renderScriptManager();
     });
   };
-  return <dialog ref={dialog} className="gimage-lightbox" aria-labelledby="scriptManagerTitle" onClose={() => updateScriptUI({ open: false })}>
+  return <Modal open={state.open} className="gimage-lightbox" aria-labelledby="scriptManagerTitle" onClose={() => updateScriptUI({ open: false })}>
     <h2 id="scriptManagerTitle">{state.owner} · SCRIPTS</h2>
     <div>
       <p className="mut">Loose command callbacks: {state.callbacks} (frame: {state.frames}, intervals: {state.intervals}). These closures are not restored; use a named script for persistence.</p>
@@ -39,5 +34,5 @@ export function ScriptManager() {
       <button className="b" onClick={() => void action(api => api.stopManagerCallbacks())}>STOP LOOSE CALLBACKS</button>
       <button className="b" onClick={() => updateScriptUI({ open: false })}>CLOSE</button>
     </div>
-  </dialog>;
+  </Modal>;
 }

@@ -32,7 +32,7 @@ export function askUser(options?: any, agent: any = null): any {
       cancel: any = document.createElement('button');
     card.className = 'pn';
     card.style.padding = '12px';
-    title.textContent = (agent?.name || 'JARVIS') + ' asks';
+    title.textContent = (agent?.name || 'LUMA') + ' asks';
     text.textContent = String(p.question || 'Please confirm');
     const raw: any = p.type === 'yesno' ? ['Yes', 'No'] : Array.isArray(p.options) ? p.options : [],
       multiple: any = !!p.multiple,

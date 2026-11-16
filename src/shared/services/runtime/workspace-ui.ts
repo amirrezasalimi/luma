@@ -80,6 +80,11 @@ export function rq(): any {
   workspaceUiState.rqT = setTimeout((): any => renderAg(), 120);
 }
 export function renderExecutionLogs(logs?: any): any {
+  logs = [...logs].reverse();
+  logs = logs.map((entry: any) => entry.toolRecord ? {
+    ...entry,
+    execution: { code: 'Tool run ' + entry.toolRecord.id, result: 'Expand to load full arguments and result from tool history.' }
+  } : entry);
   return logs.map((l?: any): any => l.execution ? '<details data-execution="' + l.t + '" ' + (workspaceUiState.executionOpen.has(l.t) ? 'open' : '') + '><summary>' + profilesContextState.esc(l.text) + '</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + profilesContextState.esc(l.execution.code) + '\n\nRESULT:\n' + profilesContextState.esc(JSON.stringify({
     result: l.execution.result,
     output: l.execution.output,
@@ -97,11 +102,12 @@ export function renderAg(): any {
     })),
     body: any = workspaceUiState.agp.querySelector('.bd'),
     bodyScroll: any = body.scrollTop;
-  const markup: any = workspaceUiState.mainRow() + ([...profilesContextState.AG.values()].map((a?: any): any => {
+  const backendMarkup = backendAgents.map(a => '<div class="ar"><div class="rh"><b>' + profilesContextState.esc(a.name) + '</b><i>backend · ' + profilesContextState.esc(a.status) + (a.outcome === 'unverified' ? ' · UNVERIFIED' : '') + '</i></div><div class="sy">' + profilesContextState.esc(a.task) + '</div>' + (a.outcome_detail ? '<details><summary>Latest outcome</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + profilesContextState.esc(a.outcome_detail) + '</pre></details>' : '') + '<div class="bt">' + ['inspect','resume','stop','remove'].map(op => '<button data-backend-agent="' + profilesContextState.esc(a.id) + '" data-backend-operation="' + op + '">' + op.toUpperCase() + '</button>').join('') + '</div><pre data-backend-detail="' + profilesContextState.esc(a.id) + '" style="white-space:pre-wrap"></pre></div>').join('');
+  const markup: any = workspaceUiState.mainRow() + backendMarkup + ([...profilesContextState.AG.values()].filter((a: any) => !backendAgents.some(b => b.id === a.id || b.name.toLowerCase() === a.name.toLowerCase())).map((a?: any): any => {
     const last: any = a.log.length ? a.log[a.log.length - 1].text : '';
     const peerBadge: any = a.peers.size ? '<span class="peer-tag" title="Authorized Peers">⇄ ' + profilesContextState.esc([...a.peers].join(',')) + '</span>' : '';
     return '<div class="ar' + (a.status === 'running' ? ' run' : '') + '" data-id="' + a.id + '"><div class="rh" data-a="tog"><span class="dot ' + a.status + '" style="background:' + (a.status === 'error' ? '#ff2a38' : a.pal.hex) + '"></span><b style="color:' + a.pal.hex + '">' + profilesContextState.esc(a.name) + '</b>' + peerBadge + '<i>' + profilesContextState.esc(a.model) + ' · ' + a.step + '/' + (a.unlimited ? '∞' : profilesContextState.agentLimit(a)) + ' ' + (a.open ? '▾' : '▸') + '</i></div>' + '<div class="sy" data-a="tog">' + (a.think ? '<span class="th">thinking…</span> ' : '') + profilesContextState.esc(last) + '</div>' + (a.lastErr ? '<div class="err-box"><b>FAILED:</b> ' + profilesContextState.esc(a.lastErr) + '</div>' : '') + (a.open ? '<div class="tl">' + a.tasks.map((t?: any): any => '<div>' + (t.st === 'run' ? '▶' : t.st === 'done' ? '✓' : '■') + ' ' + profilesContextState.esc(t.text) + '</div>').join('') + '</div><div class="lg">' + renderExecutionLogs(a.log.slice(-16)) + '</div><div class="bt">' + (a.status === 'running' ? '<button data-a="stop">STOP</button>' : '<button data-a="run">RETRY / RESUME</button>') + '<button data-a="scripts">SCRIPTS</button><button data-a="talk">TALK</button><button data-a="turns">MAX TURNS</button><button data-a="limit">' + (a.unlimited ? 'UNLIMITED ✓' : 'LIMITED') + '</button><button data-a="peer">' + (a.peers.has('*') ? 'ISOLATE' : 'SHARE PEERS') + '</button><button data-a="clr">CLEAR WORK</button><button data-a="kill">REMOVE HOLO</button></div><input data-t="' + a.id + '" placeholder="message ' + profilesContextState.esc(a.name) + ' + Enter">' : '') + '</div>';
-  }).join('') || '<div class="mut">No sub-agents yet. Ask Jarvis for something big, or launch one above.</div>');
+  }).join('') || '<div class="mut">No sub-agents yet. Ask Luma for something big, or launch one above.</div>');
   if (box.innerHTML !== markup) {
     box.innerHTML = markup;
     for (const state of scrollState) {
@@ -113,6 +119,17 @@ export function renderAg(): any {
   }
 }
 export function createWorkspaceControls(): void {
+  document.addEventListener('click', event => {
+    const button = (event.target as Element)?.closest<HTMLElement>('[data-backend-agent]');
+    if (!button) return;
+    event.preventDefault(); event.stopPropagation();
+    const session = sessionsState.activeSession?.id;
+    if (!session) return;
+    void rpc.host.ai.manageAgents({ session, input: { operation: button.dataset.backendOperation as any, target: button.dataset.backendAgent, options: {} } }).then(result => {
+      const detail = button.closest('.ar')?.querySelector('pre');
+      if (detail) detail.textContent = JSON.stringify(result, null, 2);
+    }).catch(error => alert(error.message));
+  }, true);
   workspaceUiState.agp = document.getElementById('agents-panel-host')!;
   mountAgentsPanel(workspaceUiState.agp);
   workspaceUiState.tlp = document.getElementById('build-tools-host')!;
@@ -144,11 +161,21 @@ export function createWorkspaceControls(): void {
     if (e.target.dataset?.execution) {
       const id: any = +e.target.dataset.execution;
       if (e.target.open) workspaceUiState.executionOpen.add(id);else workspaceUiState.executionOpen.delete(id);
+      if (e.target.open) {
+        const all = [hologramControlsState.MAIN, ...profilesContextState.AG.values()];
+        const entry = all.flatMap((owner: any) => [...(owner.log || []), ...(owner.archive || []), ...(owner.logArchive || [])]).find((l: any) => l.t === id && l.toolRecord);
+        if (entry) {
+          const pre = e.target.querySelector('pre');
+          void rpc.host.ai.toolHistory(entry.toolRecord).then(record => {
+            if (pre?.isConnected) pre.textContent = JSON.stringify(record, null, 2);
+          }).catch(error => { if (pre?.isConnected) pre.textContent = 'Could not load tool history: ' + error.message; });
+        }
+      }
     }
   }, true);
   workspaceUiState.mainRow = (): any => {
     const last: any = hologramControlsState.MAIN.log.length ? hologramControlsState.MAIN.log[hologramControlsState.MAIN.log.length - 1].text : '';
-    return '<div class="ar' + (sceneFoundationState.mode !== 'idle' ? ' run' : '') + '" data-id="main"><div class="rh" data-a="tog"><span class="dot" style="background:#ffb400"></span><b style="color:#ffb400">JARVIS</b><span class="peer-tag">main</span><i>' + profilesContextState.esc(sceneFoundationState.cfg.model) + ' · ' + profilesContextState.esc(sceneFoundationState.mode) + (sceneFoundationState.talkTo ? ' · talk>' + profilesContextState.esc(sceneFoundationState.talkName) : '') + ' ' + (hologramControlsState.MAIN.open ? '▾' : '▸') + '</i></div><div class="sy" data-a="tog">' + profilesContextState.esc(last) + '</div>' + (hologramControlsState.MAIN.open ? '<div class="lg">' + renderExecutionLogs(hologramControlsState.MAIN.log.slice(-18)) + '</div><div class="bt"><button data-a="scripts">SCRIPTS</button><button data-a="stop">STOP</button><button data-a="clr">CLEAR LOG</button></div><input data-t="main" placeholder="message JARVIS + Enter">' : '') + '</div>';
+    return '<div class="ar' + (sceneFoundationState.mode !== 'idle' ? ' run' : '') + '" data-id="main"><div class="rh" data-a="tog"><span class="dot" style="background:#ffb400"></span><b style="color:#ffb400">LUMA</b><span class="peer-tag">main</span><i>' + profilesContextState.esc(sceneFoundationState.cfg.model) + ' · ' + profilesContextState.esc(sceneFoundationState.mode) + (sceneFoundationState.talkTo ? ' · talk>' + profilesContextState.esc(sceneFoundationState.talkName) : '') + ' ' + (hologramControlsState.MAIN.open ? '▾' : '▸') + '</i></div><div class="sy" data-a="tog">' + profilesContextState.esc(last) + '</div>' + (hologramControlsState.MAIN.open ? '<div class="lg">' + renderExecutionLogs(hologramControlsState.MAIN.log.slice(-18)) + '</div><div class="bt"><button data-a="scripts">SCRIPTS</button><button data-a="stop">STOP</button><button data-a="clr">CLEAR LOG</button></div><input data-t="main" placeholder="message LUMA + Enter">' : '') + '</div>';
   };
   renderAg();
   refreshUI();
@@ -270,3 +297,6 @@ export function installAgentPanelHandlers(panelRoot: HTMLElement): () => void {
     launchButton?.removeEventListener('click', launch);
   };
 }
+import { rpc } from '../rpc';
+import { backendAgents } from './backend-runs';
+import { sessionsState } from './sessions';

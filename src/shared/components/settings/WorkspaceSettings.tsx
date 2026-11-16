@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Modal } from '../Modal';
 import { Action, Field, Select } from './controls';
 import { useRuntimeSettings, type SettingsServices } from '../../services/settings';
 
@@ -41,7 +42,6 @@ export function WorkspaceSettings({ services, active }: { services: SettingsServ
 }
 
 export function NewSessionDialog() {
-  const dialog = useRef<HTMLDialogElement>(null);
   const requested = useRuntimeSettings(state => state.newSessionRequested);
   const services = useRuntimeSettings(state => state.services);
   const [name, setName] = useState('');
@@ -50,13 +50,12 @@ export function NewSessionDialog() {
   useEffect(() => {
     if (requested) {
       setName('Session ' + new Date().toLocaleString()); setError('');
-      dialog.current?.showModal();
-    } else dialog.current?.close();
+    }
   }, [requested]);
-  return <dialog ref={dialog} className="gimage-lightbox" aria-labelledby="new-session-title"
-    onCancel={event => { event.preventDefault(); if (!busy) useRuntimeSettings.setState({ newSessionRequested: false }); }}>
+  return <Modal open={requested} className="gimage-lightbox" aria-labelledby="new-session-title"
+    onClose={() => { if (!busy) useRuntimeSettings.setState({ newSessionRequested: false }); }}>
     <h2 id="new-session-title">Start a new session?</h2>
-    <p>The current stage, panels and history will be saved. Active agents and tool requests stop. Souls and connection settings stay shared.</p>
+    <p>The current objects, panels and history will be saved. Active agents and tool requests stop. Background, hologram appearance, floor settings, Souls and connection settings stay shared.</p>
     <Field label="Session name" maxLength={100} value={name} onChange={setName} />
     <p role="alert">{error}</p>
     <div className="r"><Action disabled={busy} onClick={() => useRuntimeSettings.setState({ newSessionRequested: false })}>CANCEL</Action><Action disabled={busy || !services} onClick={() => {
@@ -64,5 +63,5 @@ export function NewSessionDialog() {
       setBusy(true);
       void services.newSession(name).then(() => useRuntimeSettings.setState({ newSessionRequested: false })).catch(cause => setError(String(cause))).finally(() => setBusy(false));
     }}>SAVE & START NEW</Action></div>
-  </dialog>;
+  </Modal>;
 }

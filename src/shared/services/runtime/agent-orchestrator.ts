@@ -1,4 +1,5 @@
 import { rpc } from '../rpc';
+import { sessionsState } from './sessions';
 import { SCENE_API_PROMPT } from '../../prompts/scene-api';
 import { AGENT_SYSTEM_PROMPT } from '../../prompts/agent';
 import { extractJavaScript } from '../../utils/script';
@@ -133,7 +134,7 @@ export function spawn(name?: any, task?: any, model?: any, force?: any, peersStr
   model = typeof model === 'string' ? model.trim() : '';
   const profile: any = profilesContextState.soulProfile(name);
   const idle: any = opts.idle === true || !task.trim();
-  const ex: any = force ? null : [...profilesContextState.AG.values()].find((a?: any): any => name && profilesContextState.soulKey(a.name) === profilesContextState.soulKey(name)) || (task.trim() ? related(name, task, force) : null);
+  const ex: any = force ? null : [...profilesContextState.AG.values()].find((a?: any): any => name && profilesContextState.soulKey(a.name) === profilesContextState.soulKey(name)) || (!name && task.trim() ? related(name, task, force) : null);
   if (ex) {
     if (opts.maxTurns !== undefined) {
       ex.maxTurns = Math.round(profilesContextState.num(opts.maxTurns, 1, 100000, profilesContextState.ext.max));
@@ -277,6 +278,7 @@ export async function llm(a?: any): Promise<any> {
         apiKey: profilesContextState.ext.ak || sceneFoundationState.cfg.key,
         model: a.model,
         profile: a.name,
+        session_id: sessionsState.activeSession?.id,
         host_tools: !!profilesContextState.ext.code,
         context_window: Number(profilesContextState.contextConfig.maxTokens) || 128000,
         ...(profilesContextState.ext.ar ? {
@@ -293,8 +295,11 @@ export async function llm(a?: any): Promise<any> {
     if (event.type !== 'pi') continue;
     const info = event.event;
     if (info.type === 'soul_updated') updateAgentProfile(a, { soul: info.text });
-    if (info.type === 'tool_execution_start') logA(a, 'Pi tool: ' + info.toolName);
-    if (info.type === 'tool_execution_end') logA(a, 'Pi tool: ' + info.toolName + (info.isError ? ' failed' : ' completed'), !!info.isError);
+    if (info.type === 'tool_execution_start' || info.type === 'tool_execution_end') {
+      logA(a, 'Pi tool: ' + info.toolName + (info.type === 'tool_execution_start' ? ' started' : info.isError ? ' failed' : ' completed'), info.type === 'tool_execution_end' && !!info.isError);
+      const entry = a.log.at(-1);
+      if (entry && info.recordId) entry.toolRecord = { id: info.recordId, session: sessionsState.activeSession?.id };
+    }
     if (info.type === 'extension_error') logA(a, info.message, true);
   }
   if (content === undefined) throw new Error('Pi stream ended before completion');

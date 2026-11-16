@@ -146,6 +146,8 @@ export function connectSettings(): void {
         await refreshMcps();
       },
       setBackground: async (url?: any): Promise<any> => {
+        const { persistBackground } = await import('./background-sync');
+        await persistBackground(url || null);
         await setStageBackground(url || null);
         await saveSession(true);
         settingsChanged();

@@ -275,7 +275,7 @@ export function holoTarget(t?: any, x?: any, by?: any): any {
   if (t && typeof t === 'object' && t.id && profilesContextState.AG.has(t.id)) return profilesContextState.AG.get(t.id);
   if (t == null || t === '' || t === 'me' || t === 'self') return x.ag || mainOrchestratorState.findA(by) || null;
   const s: any = String(t).toLowerCase();
-  if (s === 'main' || s === 'jarvis') return null;
+  if (s === 'main' || s === 'luma' || s === 'jarvis') return null;
   const a: any = mainOrchestratorState.findA(t);
   if (!a) throw new Error('no agent "' + t + '" (hologram targets: main or an agent name)');
   return a;
@@ -293,17 +293,7 @@ export function resetHologramSetting(t?: any, x?: any, by?: any): any {
   }
   holoLabel('reset', null, null, by, null);
   return holoApply({
-    x: 0,
-    y: 3.7,
-    z: 0,
-    radius: 2.8,
-    floorRadius: 6.4,
-    floorGrid: 1.2,
-    color: '#ffb400',
-    speakingColor: '#44e0e8',
-    ringColor: '#ffb400',
-    ringSpeakingColor: '#44e0e8',
-    floorColor: '#4a5a9e'
+    ...SCENE_DEFAULTS.hologram
   }, 1);
 }
 export function holoH(t?: any, x?: any, by?: any): any {
@@ -635,3 +625,4 @@ export function prepareHologramControls(): void {
   // ---------------- 12c. Scene objects & node hierarchy ----------------
 }
 import { inFrameUpdate } from './log-context';
+import { SCENE_DEFAULTS } from '../scene-defaults';

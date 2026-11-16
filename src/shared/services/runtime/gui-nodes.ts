@@ -103,11 +103,10 @@ export function mkAct(g?: any, v?: any): any {
   if (v == null || v === false) return null;
   if (typeof v === 'function') return v;
   if (typeof v === 'string') {
-    const f: any = new Function('J', 'self', 'e', 'with(J){' + v + '\n}\n//# sourceURL=jv_gui' + g.id.replace(/\W/g, ''));
-    return (e?: any, h?: any): any => f(mkApi({
-      by: g.by,
-      tm: g.tm
-    }), h, e);
+    return (e?: any, h?: any): any => {
+      const f: any = new Function('J', 'self', 'e', 'with(J){' + v + '\n}\n//# sourceURL=jv_gui' + g.id.replace(/\W/g, ''));
+      return f(mkApi({ by: g.by, tm: g.tm }), h, e);
+    };
   }
   throw new TypeError('gui action must be a function or a source string');
 }
@@ -170,9 +169,17 @@ export function fireG(g?: any, k?: any, ev?: any): any {
   };
   try {
     const r: any = f(E, E.target);
-    if (r && r.catch) r.catch((er?: any): any => gfail(g, k, er)).finally((): any => {
-      if (action) finishUndoAction(action);
-    });else if (action) finishUndoAction(action);
+    if (r && typeof r.then === 'function') {
+      Promise.resolve(r).then((): any => {
+        if (g.err) {
+          g.err = null;
+          g.el.style.outline = '';
+          g.el.title = g.p.tip || '';
+        }
+      }, (er?: any): any => gfail(g, k, er)).finally((): any => {
+        if (action) finishUndoAction(action);
+      });
+    } else if (action) finishUndoAction(action);
     if (g.err) {
       g.err = null;
       g.el.style.outline = '';
@@ -258,7 +265,10 @@ export async function setStageBackground(src?: any, options: any = {}): Promise<
     })),
     sprite: any = new PIXI.Sprite(texture);
   sprite.anchor.set(.5);
-  sprite.filters = [backgroundImageFilter()];
+   // Shader filters are WebGL-only; Canvas still displays the source image.
+   if (sceneFoundationState.app.renderer.type === PIXI.RENDERER_TYPE.WEBGL) {
+     sprite.filters = [backgroundImageFilter()];
+   }
   sprite.filterArea = sceneFoundationState.app.screen;
   clearStageBackgroundSprite();
   Object.assign(sceneFoundationState.stageBackground, {

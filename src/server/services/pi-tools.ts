@@ -8,7 +8,7 @@ export function createPiHostTools(enabled: boolean, workspace: string): ToolDefi
   if (!enabled) return [];
   const execute = createCodeAgentService({ enabled, workspace, fullAccess: true });
   return [{
-    name: 'jarvis_host', label: 'Jarvis host',
+    name: 'jarvis_host', label: 'Luma host',
     description: 'Full host file list/read/write/edit/delete and Bash execution, subject to OS user permissions. Absolute paths may address files outside the workspace; relative paths and default command cwd use the workspace. Not sandboxed. Preserve unrelated work and obtain user approval for destructive actions. Prefer these native operations over browser JavaScript for host work.',
     parameters: Type.Object({
       op: Type.Union(['list', 'read', 'write', 'edit', 'delete', 'bash'].map(value => Type.Literal(value))),

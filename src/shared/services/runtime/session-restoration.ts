@@ -17,6 +17,12 @@ import { build } from './script-lifecycle';
 import { mkApi } from './script-api';
 import { loadUndo } from './workspace-history';
 import { spawn } from './agent-orchestrator';
+import { snapshotSession } from './sessions';
+
+function workspaceAppearance() {
+  const snapshot = snapshotSession();
+  return Object.fromEntries(['background', 'hologram', 'palettes', 'sceneDefaults'].map(key => [key, snapshot[key]]));
+}
 
 export function restoreSession(s?: any): any {
   sessionsState.sessionRestoring = true;
@@ -221,8 +227,11 @@ export async function loadSession(id?: any): Promise<any> {
     if (!confirm('Save the current session and switch? Active agents will be stopped.')) return;
     stopSessionWork();
     await saveSession(true);
+    const appearance = workspaceAppearance();
     sessionsState.activeSession = row;
-    restoreSession(row.snapshot);
+    restoreSession({ ...row.snapshot, ...appearance });
+    void import('./background-sync').then(module => module.syncBackground()).catch(error => logM('Background sync failed: ' + error.message, true));
+    void import('./backend-runs').then(module => module.restoreBackendRuns()).catch(error => logM('Backend reconnect failed: ' + error.message, true));
     void loadUndo();
     sessionsState.lastSnapshot = '';
     await saveSession(true);
@@ -252,6 +261,7 @@ export async function createNewSession(name?: any): Promise<any> {
   };
   const blank: any = {
     ...sessionPlain(sessionsState.initialSessionDefaults),
+    ...workspaceAppearance(),
     version: 1,
     agents: [],
     objects: [],
@@ -296,6 +306,8 @@ export async function initSessions(): Promise<any> {
       }
     }
     sessionsState.sessionReady = true;
+    void import('./scene-command-sync').then(module => module.startSceneCommandSync());
+    void import('./backend-runs').then(module => { module.monitorBackendAgents(); return module.restoreBackendRuns(); }).catch(error => logM('Backend reconnect failed: ' + error.message, true));
     phase = 'restoring undo history';
     void loadUndo();
     phase = 'saving the restored session';

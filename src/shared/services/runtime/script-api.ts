@@ -1,4 +1,5 @@
 import { host } from '../host';
+import { SCENE_DEFAULTS } from '../scene-defaults';
 import { updateScriptUI, useRuntimeUI } from '../../../stores/runtime-ui';
 /** script-api: runtime implementation. */
 import { saveSession, sessionsState } from './sessions';
@@ -8,7 +9,7 @@ import { HD, attach, build, detach, exp, fail, scriptLifecycleState, unmountS } 
 import { holoApply, holoH, hologramControlsState, logM, resetHologramSetting, wrapLog } from './hologram-controls';
 import { sceneFoundationState } from './scene-foundation';
 import { mainOrchestratorState } from './main-orchestrator';
-import { logA, notifyJarvis, spawn, tell } from './agent-orchestrator';
+import { agentOrchestratorState, grantPeers, logA, notifyJarvis, spawn, tell } from './agent-orchestrator';
 import { addGui, delGui, guiNodesState, setStageBackground } from './gui-nodes';
 import { act, scene, dumpObject } from './scene-actions';
 import { HG, guiNodes2State } from './gui-handles';
@@ -276,6 +277,35 @@ export function mkApi(x?: any): any {
     },
     get_camera: cameraState,
     set_camera: setCamera,
+    scene_defaults: (section?: string): any => {
+      if (!section) return { sections: ['camera', 'hologram', 'colors', 'floor', 'objects', 'background', 'gui'], usage: 'scene_defaults(section); reset_scene(section) resets only that section' };
+      const defaults = SCENE_DEFAULTS.hologram;
+      if (section === 'colors') return Object.fromEntries(Object.entries(defaults).filter(([key]) => key.toLowerCase().includes('color')));
+      if (section === 'floor') return { floorRadius: defaults.floorRadius, floorGrid: defaults.floorGrid, floorColor: defaults.floorColor };
+      if (section === 'gui') return JSON.parse(JSON.stringify(guiNodesState.GD));
+      if (!(section in SCENE_DEFAULTS)) throw new Error('Unknown defaults section: ' + section);
+      return JSON.parse(JSON.stringify(SCENE_DEFAULTS[section as keyof typeof SCENE_DEFAULTS]));
+    },
+    reset_scene: async (section: string): Promise<any> => {
+      if (section === 'camera') return setCamera({ ...SCENE_DEFAULTS.camera });
+      if (section === 'background') {
+        const { persistBackground } = await import('./background-sync');
+        await persistBackground(null);
+        return setStageBackground(null);
+      }
+      if (section === 'objects') {
+        Object.assign(profilesContextState.DEF, SCENE_DEFAULTS.objects);
+        return { ...profilesContextState.DEF }; // New object defaults only; existing objects are untouched.
+      }
+      if (['hologram', 'colors', 'floor'].includes(section)) {
+        const defaults = SCENE_DEFAULTS.hologram;
+        const patch = section === 'hologram' ? { ...defaults } : section === 'floor'
+          ? { floorRadius: defaults.floorRadius, floorGrid: defaults.floorGrid, floorColor: defaults.floorColor }
+          : Object.fromEntries(Object.entries(defaults).filter(([key]) => key.toLowerCase().includes('color')));
+        return holoApply(patch);
+      }
+      throw new Error('Unsupported reset section. Use camera, hologram, colors, floor, objects (new-object defaults only), or background. GUI/panel contents require targeted edits; no destructive reset-all is provided.');
+    },
     reset_camera: (): any => setCamera({
       yaw: .6,
       zoom: 1,
@@ -308,6 +338,19 @@ export function mkApi(x?: any): any {
     get world() {
       return hologramControlsState.worldObj();
     },
+    get speech_level(): number {
+      return voicePipelineState.speechLevel || 0;
+    },
+    get mic_level(): number {
+      return voicePipelineState.muted ? 0 : Math.max(0, Math.min(1, sceneFoundationState.micE || 0));
+    },
+    get_audio_state: (): any => ({
+      speechLevel: voicePipelineState.speechLevel || 0,
+      microphoneLevel: voicePipelineState.muted ? 0 : Math.max(0, Math.min(1, sceneFoundationState.micE || 0)),
+      microphoneMuted: !!voicePipelineState.muted,
+      speaker: voicePipelineState.pAn ? voicePipelineState.speechOwner?.name || 'main' : null,
+      mode: sceneFoundationState.mode
+    }),
     get holo() {
       return hologramControlsState.worldObj().holo;
     },
@@ -360,8 +403,16 @@ export function mkApi(x?: any): any {
       id: q.id,
       ...panelBounds(q)
     })),
-    set_background_image: (src?: any, options?: any): any => setStageBackground(src, options),
-    remove_background_image: (): any => setStageBackground(null),
+    set_background_image: async (src?: any, options?: any): Promise<any> => {
+      const { persistBackground } = await import('./background-sync');
+      await persistBackground(src || null, options || {});
+      return setStageBackground(src, options);
+    },
+    remove_background_image: async (): Promise<any> => {
+      const { persistBackground } = await import('./background-sync');
+      await persistBackground(null);
+      return setStageBackground(null);
+    },
     get_background_image: (): any => ({
       ...sceneFoundationState.stageBackground.config
     }),
@@ -421,7 +472,7 @@ export function mkApi(x?: any): any {
     // holograms: hologram(target?) handle for the main hologram or any sub-agent; the shortcuts act on main unless the last arg names a target
     get_active_agent: (): any => ({
       id: sceneFoundationState.talkTo || 'main',
-      name: sceneFoundationState.talkName || 'JARVIS'
+      name: sceneFoundationState.talkName || 'LUMA'
     }),
     switch_agent: (target?: any): any => {
       const name: any = String(target?.id ?? target ?? 'main').trim(),
@@ -435,7 +486,7 @@ export function mkApi(x?: any): any {
       }
       return {
         id: a?.id || 'main',
-        name: a?.name || 'JARVIS',
+        name: a?.name || 'LUMA',
         switched: true
       };
     },
@@ -542,6 +593,39 @@ export function mkApi(x?: any): any {
       if (x.ag) x.ag.finIdle = true;
     },
     ask_main_agent: (t?: any): any => askMain(t, by),
+    manage_agents: (operation: string, target?: string, options: any = {}): any => {
+      if (x.ag || by !== 'jarvis') throw new Error('Agent management is reserved for the main orchestrator');
+      const inspect = (a: any): any => ({
+        ...hologramControlsState.agInfo(a), task: a.task, step: a.step, lastError: a.lastErr,
+        peers: [...a.peers], pendingMessages: [...a.inbox],
+        logs: a.log.slice(-20), messages: a.msgs.slice(-6)
+      });
+      if (operation === 'list') return [...profilesContextState.AG.values()].map(inspect);
+      if (operation === 'spawn') {
+        if (!target?.trim()) throw new Error('Agent name is required');
+        const existing = mainOrchestratorState.findA(target);
+        if (existing) throw new Error('Agent already exists; use resume or tell instead');
+        return inspect(spawn(target, options.task || '', options.model, true, options.peers || '', options));
+      }
+      const all = target === 'all' && ['stop', 'remove'].includes(operation);
+      const agents = all ? [...profilesContextState.AG.values()] : [mainOrchestratorState.findA(target)];
+      if (!all && !agents[0]) throw new Error('Agent not found: ' + target);
+      return agents.map(a => {
+        if (operation === 'inspect') return inspect(a);
+        if (operation === 'resume') {
+          if (a.status !== 'running') tell(a, options.message || 'Continue your existing task from your saved history; report the outcome');
+        } else if (operation === 'tell') {
+          if (!options.message?.trim()) throw new Error('Message is required');
+          tell(a, options.message);
+        } else if (operation === 'stop') agentOrchestratorState.stopA(a);
+        else if (operation === 'remove') { agentOrchestratorState.killA(a); return { id: a.id, name: a.name, removed: true }; }
+        else if (operation === 'share') grantPeers(a, options.peers || 'all');
+        else if (operation === 'unshare') a.peers.clear();
+        else if (operation === 'talk') setTalk(a.id);
+        else throw new Error('Unknown management operation: ' + operation);
+        return inspect(a);
+      });
+    },
     spawn_agent: (n?: any, g?: any, o?: any): any => {
       o = o || {};
       const ag: any = x.ag || mainOrchestratorState.findA(by),

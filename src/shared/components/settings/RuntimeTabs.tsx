@@ -7,7 +7,7 @@ export function VoiceSettings({ services, draft, patch }: {
   services: SettingsServices; draft: JarvisConfig; patch(values: Partial<JarvisConfig>): void;
 }) {
   const [voices, setVoices] = useState<VoiceOption[]>([]);
-  const [text, setText] = useState('Hello. I am Jarvis, ready when you are.');
+  const [text, setText] = useState('Hello. I am Luma, ready when you are.');
   const status = useRuntimeSettings(state => state.voiceStatus);
   const busy = useRuntimeSettings(state => state.voiceBusy);
   const [loading, setLoading] = useState(false);

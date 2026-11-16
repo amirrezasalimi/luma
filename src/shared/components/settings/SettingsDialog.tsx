@@ -9,6 +9,7 @@ import { MarketplaceSettings } from './MarketplaceSettings';
 import { PiExtensionsSettings } from './PiExtensionsSettings';
 import { SettingsConfirmProvider } from './ConfirmDialog';
 import { WorkspaceSettings } from './WorkspaceSettings';
+import { Modal } from '../Modal';
 
 const TABS = [
   ['main', 'Main LLM'], ['voice', 'Voice'], ['agents', 'Sub-agents'],
@@ -63,6 +64,7 @@ function SettingsDialogContent() {
   };
   return <>
     <button ref={gear} id="gear" title="Settings" aria-label="Settings" aria-haspopup="dialog" onClick={show}>⚙</button>
+    <Modal open={open} onClose={close} className="settings-modal-base" aria-labelledby="settings-title">
     <div id="m" className={open ? 'on' : ''} aria-hidden={!open} inert={!open} onClick={event => {
       if (event.target === event.currentTarget) close();
     }}>
@@ -77,7 +79,7 @@ function SettingsDialogContent() {
             event.preventDefault(); last?.focus();
           } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
         }}>
-        <header className="settings-heading"><div><span className="settings-eyebrow">JARVIS / CONTROL CENTER</span><h2 id="settings-title">Settings</h2><p>Make this workspace yours.</p></div><button type="button" className="settings-dismiss" aria-label="Close settings" onClick={close}>×</button></header>
+        <header className="settings-heading"><div><span className="settings-eyebrow">LUMA / CONTROL CENTER</span><h2 id="settings-title">Settings</h2><p>Make this workspace yours.</p></div><button type="button" className="settings-dismiss" aria-label="Close settings" onClick={close}>×</button></header>
         <div className="settings-layout">
           <nav className="settings-nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical"
             onKeyDown={event => {
@@ -123,5 +125,6 @@ function SettingsDialogContent() {
         <div className="r settings-footer"><span className="settings-footer-note">Connection & workspace preferences</span><Action disabled={saving} onClick={close}>CLOSE</Action><button type="button" className="b settings-save" disabled={saving} onClick={() => { void save(); }}>{saving ? 'SAVING…' : 'SAVE CHANGES'}</button></div>
       </div>
     </div>
+    </Modal>
   </>;
 }

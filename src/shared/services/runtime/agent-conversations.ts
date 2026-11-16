@@ -35,7 +35,7 @@ function setTalk(id?: any): any {
   }
   sceneFoundationState.talkTo = next;
   sceneFoundationState.talkName = a ? a.name : '';
-  workspaceUiState.msg(a ? 'Talking to ' + a.name + ' (tap the core to return to Jarvis)' : 'Talking to Jarvis');
+  workspaceUiState.msg(a ? 'Talking to ' + a.name + ' (tap the core to return to Luma)' : 'Talking to Luma');
   sceneFoundationState.lab.text = a ? 'TALKING TO ' + a.name.toUpperCase() : sceneFoundationState.mode === 'idle' ? 'TAP THE CORE TO SPEAK' : voicePipelineState.muted ? 'MIC MUTED (M)' : 'LISTENING...';
 }
 export async function awaitAgentConversation(a?: any, text?: any): Promise<any> {

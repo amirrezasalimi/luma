@@ -402,7 +402,7 @@ export async function saveSession(force: any = false): Promise<any> {
 export function stopSessionWork(): any {
   cancelQuestions();
   hologramControlsState.workspaceEpoch++;
-  cancelTurn();
+  cancelTurn(false);
   stopMic();
   sceneFoundationState.mode = 'idle';
   sceneFoundationState.lab.text = 'TAP THE CORE TO SPEAK';

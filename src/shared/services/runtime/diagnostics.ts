@@ -301,7 +301,7 @@ export function renderDebug(): any {
   ctx.stroke();
   const rows: any = [{
     id: 'main',
-    name: 'JARVIS',
+    name: 'Luma',
     status: sceneFoundationState.mode,
     model: sceneFoundationState.cfg.model,
     messages: voicePipelineState.hist,
